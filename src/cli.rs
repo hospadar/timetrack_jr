@@ -6,10 +6,10 @@ use clap::{Parser, Subcommand};
 #[command(propagate_version = true)]
 pub struct Cli {
     #[arg(long, default_value = "ttjr.sqlite3")]
-    db_path: Option<String>,
+    pub db_path: Option<String>,
 
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
