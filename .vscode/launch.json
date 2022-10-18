@@ -10,7 +10,7 @@
             "name": "Debug",
             "program": "${workspaceFolder}/target/debug/timetrack_jr",
             "preLaunchTask": "build",
-            "args": ["config"],
+            "args": ["config", "show"],
             "cwd": "${workspaceFolder}"
         }
     ]

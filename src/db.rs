@@ -1,14 +1,27 @@
 use rusqlite::{Connection};
 use std::collections::{BTreeMap};
+use serde::{Serialize, Deserialize};
+
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const PRETTY_INDENT: u16 = 2;
 
+#[derive(Serialize, Deserialize)]
+pub struct Config {
+    options: Options,
+    categories: Categories
+}
+
+pub type Options = BTreeMap<String, String>;
+pub type Categories = BTreeMap<String, Category>;
+
+#[derive(Serialize, Deserialize)]
 pub struct Category {
     name: String,
     keys: Option<String>
 }
 
+#[derive(Serialize, Deserialize)]
 pub struct TimeWindow {
     id: u64,
     category: String,
@@ -57,8 +70,8 @@ pub fn initialize_db(conn: &Connection) -> Result<&Connection, rusqlite::Error> 
     return Result::Ok(&conn);
 }
 
-pub fn print_config(conn: &Connection) -> Result<(), rusqlite::Error> {
-    let mut options: BTreeMap<String, String> = BTreeMap::new();
+pub fn get_options(conn: &Connection) -> Result<Options, rusqlite::Error> {
+    let mut options: Options = Options::new();
     let mut stmt = conn.prepare("SELECT name, value FROM options")?;
     let mut rows = stmt.query(())?;
 
@@ -66,19 +79,22 @@ pub fn print_config(conn: &Connection) -> Result<(), rusqlite::Error> {
         options.insert(row.get(0)?, row.get(1)?);
     }
 
-    let mut categories: Vec<String> = Vec::new();
-    let mut stmt = conn.prepare("SELECT name FROM categories order by name")?;
+    Ok(options)
+}
+
+pub fn get_categories(conn: &Connection) -> Result<Categories, rusqlite::Error> {
+    let mut categories = Categories::new();
+    let mut stmt = conn.prepare("SELECT name, keys FROM categories order by name")?;
     let mut rows = stmt.query(())?;
 
     while let Some(row) = rows.next()? {
-        categories.push(row.get(0)?);
+        categories.insert(row.get(0)?, Category { name: row.get(0)?, keys: row.get(1)? });
     }
 
-    println!(
-        "Options:\n{}\n==============\nCategories:\n{}", 
-        json::stringify_pretty(options, PRETTY_INDENT),
-        json::stringify_pretty(categories, PRETTY_INDENT)
-    );
+    Ok(categories)
+}
 
-    return Ok(());
+pub fn get_config(conn: &Connection) -> Result<Config, rusqlite::Error> {
+    
+    return Ok(Config { options: get_options(conn)?, categories: get_categories(conn)? })
 }
