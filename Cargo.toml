@@ -7,5 +7,6 @@ edition = "2021"
 
 [dependencies]
 clap = { version = "4.0.15", features = ["derive"] }
+json = "0.12.4"
 rdev = "0.5.1"
 rusqlite = "0.28.0"
