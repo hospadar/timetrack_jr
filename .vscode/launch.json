@@ -7,10 +7,19 @@
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug",
+            "name": "Debug: config show",
             "program": "${workspaceFolder}/target/debug/timetrack_jr",
             "preLaunchTask": "build",
             "args": ["config", "show"],
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "type": "lldb",
+            "request": "launch",
+            "name": "Debug: config add category",
+            "program": "${workspaceFolder}/target/debug/timetrack_jr",
+            "preLaunchTask": "build",
+            "args": ["config", "add-category", "work", "-s"],
             "cwd": "${workspaceFolder}"
         }
     ]
