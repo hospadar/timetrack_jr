@@ -15,7 +15,9 @@ pub fn execute(cli: &Cli, conn: &Connection) -> Result<(), rusqlite::Error> {
                 ConfigCommands::AddCategory { category_name, set_key_sequence } => {
                     config::add_category(conn, category_name, set_key_sequence)
                 },
-                ConfigCommands::DeleteCategory { category_name, delete_logged_times } => todo!(),
+                ConfigCommands::DeleteCategory { category_name, delete_logged_times } => {
+                    config::delete_category(conn, category_name, delete_logged_times)
+                },
                 ConfigCommands::SetKeySequence { category_name } => todo!(),
                 ConfigCommands::SetOption { option_name, option_value } => todo!(),
             }

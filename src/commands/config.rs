@@ -16,7 +16,7 @@ pub fn show(conn: &Connection) -> Result<(), rusqlite::Error> {
     Ok(())
 }
 
-pub fn add_category(conn: &Connection, name: &String, set_key_sequence: &bool) -> Result<(), rusqlite::Error> {
+pub fn add_category(conn: &Connection, category_name: &String, set_key_sequence: &bool) -> Result<(), rusqlite::Error> {
     let mut keypress = None;
     if *set_key_sequence {
         keypress = keyboard::get_keypress();
@@ -28,6 +28,10 @@ pub fn add_category(conn: &Connection, name: &String, set_key_sequence: &bool) -
             }
         }
     }
-    db::add_category(conn, name.clone(), keypress)?;
+    db::add_category(conn, &category_name, keypress)?;
     Ok(())
+}
+
+pub fn delete_category(conn: &Connection, category_name: &String, delete_logged_times: &bool) -> Result<(), rusqlite::Error> {
+    db::delete_category(conn, category_name, delete_logged_times)
 }

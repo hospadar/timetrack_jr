@@ -61,7 +61,7 @@ pub fn initialize_db(conn: &Connection) -> Result<&Connection, rusqlite::Error> 
             category TEXT NOT NULL,
             start_time INTEGER NOT NULL CHECK (start_time > 0),
             end_time INTEGER CHECK (end_time is null or end_time >= start_time),
-            FOREIGN KEY(category) REFERENCES categories(name)
+            FOREIGN KEY(category) REFERENCES categories(name) ON UPDATE CASCADE ON DELETE RESTRICT
         )", ()
     )?;
 
@@ -99,10 +99,21 @@ pub fn get_config(conn: &Connection) -> Result<Config, rusqlite::Error> {
     return Ok(Config { options: get_options(conn)?, categories: get_categories(conn)? })
 }
 
-pub fn add_category(conn: &Connection, category_name: String, keys: Option<Keypress>) -> Result<(), rusqlite::Error> {
+pub fn add_category(conn: &Connection, category_name: &String, keys: Option<Keypress>) -> Result<(), rusqlite::Error> {
     match keys {
         Some(keys) =>  conn.execute("INSERT INTO categories (name, keys) VALUES (?,?)", (category_name, format!("{}", keys)))?,
         None => conn.execute("INSERT INTO categories (name) VALUES (?)", (category_name,))?,
     };
     Ok(())
 }
+
+pub fn delete_category(conn: &Connection, category_name: &String, delete_logged_times: &bool) -> Result<(), rusqlite::Error> {
+    conn.execute("BEGIN", ())?;
+    if *delete_logged_times {
+        conn.execute("DELETE FROM times WHERE category", (&category_name,))?;
+    }
+    conn.execute("DELETE FROM categories WHERE name=?" , (&category_name,))?;
+
+    Ok(())
+}
+
