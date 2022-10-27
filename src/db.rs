@@ -1,8 +1,11 @@
 use crate::TTError;
 
-use rusqlite::Connection;
+use rusqlite::{Connection, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{
+    any::Any,
+    collections::{BTreeMap, HashSet},
+};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -23,18 +26,18 @@ pub struct Category {
 
 #[derive(Serialize, Deserialize)]
 pub struct TimeWindow {
-    id: u64,
+    id: Option<u64>,
     category: String,
     start_time: u64,
     end_time: Option<u64>,
 }
 
-pub fn initialize_db(conn: &Connection) -> Result<&Connection, TTError> {
+pub fn initialize_db(conn: &mut Connection) -> Result<(), TTError> {
     conn.execute("PRAGMA foreign_keys = ON", ())?;
 
-    conn.execute("BEGIN", ())?;
+    let tx = conn.transaction()?;
 
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS options (
             name TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -43,33 +46,32 @@ pub fn initialize_db(conn: &Connection) -> Result<&Connection, TTError> {
     )?;
 
     //might use this later to handle DB migrations if that's a thing
-    conn.execute(
+    tx.execute(
         "REPLACE INTO options (name, value) VALUES ('dbversion', ?)",
         (VERSION,),
     )?;
 
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS categories (
-            name TEXT PRIMARY KEY,
-            keys TEXT NOT NULL
+            name TEXT PRIMARY KEY
         )",
         (),
     )?;
 
-    conn.execute(
+    tx.execute(
         "CREATE TABLE IF NOT EXISTS times (
             id INTEGER PRIMARY KEY,
             category TEXT NOT NULL,
-            start_time INTEGER NOT NULL CHECK (start_time > 0),
+            start_time INTEGER NOT NULL CHECK (start_time >= 0),
             end_time INTEGER CHECK (end_time is null or end_time >= start_time),
             FOREIGN KEY(category) REFERENCES categories(name) ON UPDATE CASCADE ON DELETE RESTRICT
         )",
         (),
     )?;
 
-    conn.execute("COMMIT", ())?;
+    tx.commit()?;
 
-    return Result::Ok(&conn);
+    return Ok(());
 }
 
 pub fn get_options(conn: &Connection) -> Result<Options, TTError> {
@@ -115,15 +117,78 @@ pub fn add_category(conn: &Connection, category_name: &String) -> Result<(), TTE
 }
 
 pub fn delete_category(
-    conn: &Connection,
+    conn: &mut Connection,
     category_name: &String,
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
-    conn.execute("BEGIN", ())?;
+    let tx = conn.transaction()?;
     if *delete_logged_times {
-        conn.execute("DELETE FROM times WHERE category", (&category_name,))?;
+        tx.execute("DELETE FROM times WHERE category", (&category_name,))?;
     }
-    conn.execute("DELETE FROM categories WHERE name=?", (&category_name,))?;
+    tx.execute("DELETE FROM categories WHERE name=?", (&category_name,))?;
+    tx.commit()?;
 
     Ok(())
+}
+
+///Update a time in the DB.  does NOT commit the transaction
+pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError> {
+    let mut params: Vec<(&str, &dyn ToSql)> = Vec::new();
+
+    if let Some(id) = &time.id {
+        params.push((":id", id));
+    }
+    if let Some(end_time) = &time.end_time {
+        params.push((":end_time", end_time));
+    }
+
+    params.push((":category", &time.category));
+
+    params.push((":start_time", &time.start_time));
+
+    let param_names: Vec<String> = params
+        .iter()
+        .map(|(name, _)| name[1..].to_string())
+        .collect();
+
+    let param_placeholders: Vec<&str> = params.iter().map(|(name, _)| *name).collect();
+
+    let query = format!(
+        "REPLACE INTO times ({}) VALUES ({})",
+        param_names.join(", "),
+        param_placeholders.join(", ")
+    );
+
+    tx.execute(&query[..], &params[..])?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use rusqlite::Connection;
+
+    use super::*;
+
+    #[test]
+    pub fn test_upsert() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&mut conn).unwrap();
+        add_category(&mut conn, &"work".to_string()).unwrap();
+        let mut tx = conn.transaction().unwrap();
+        upsert_time(
+            &mut tx,
+            TimeWindow {
+                id: None,
+                category: "work".to_string(),
+                start_time: 0,
+                end_time: None,
+            },
+        )
+        .unwrap();
+
+        let rowid = tx.last_insert_rowid();
+
+        todo!("Need to check that our time actually got inserted correctly")
+    }
 }

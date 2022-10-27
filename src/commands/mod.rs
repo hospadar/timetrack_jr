@@ -6,7 +6,7 @@ mod config;
 mod export;
 mod log;
 
-pub fn execute(cli: &Cli, conn: &Connection) -> Result<(), TTError> {
+pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
     match &cli.command {
         Commands::Config { config_command } => match config_command {
             ConfigCommands::Show => config::show(conn),

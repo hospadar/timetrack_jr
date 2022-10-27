@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rusqlite::Connection;
 
-pub fn show(conn: &Connection) -> Result<(), TTError> {
+pub fn show(conn: &mut Connection) -> Result<(), TTError> {
     let config = db::get_config(conn)?;
     let json = match serde_json::to_string_pretty(&config) {
         Ok(j) => j,
@@ -15,13 +15,13 @@ pub fn show(conn: &Connection) -> Result<(), TTError> {
     Ok(())
 }
 
-pub fn add_category(conn: &Connection, category_name: &String) -> Result<(), TTError> {
+pub fn add_category(conn: &mut Connection, category_name: &String) -> Result<(), TTError> {
     db::add_category(conn, &category_name)?;
     Ok(())
 }
 
 pub fn delete_category(
-    conn: &Connection,
+    conn: &mut Connection,
     category_name: &String,
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
@@ -29,7 +29,7 @@ pub fn delete_category(
 }
 
 pub fn set_option(
-    conn: &Connection,
+    conn: &mut Connection,
     option_name: &OptionName,
     option_value: &String,
 ) -> Result<(), TTError> {

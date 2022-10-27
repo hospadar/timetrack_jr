@@ -19,12 +19,12 @@ impl From<rusqlite::Error> for TTError {
 
 fn main() {
     let cli = cli::Cli::parse();
-    let conn =
+    let mut conn =
         rusqlite::Connection::open(&cli.db_path.as_ref().unwrap()).expect("Couldn't open DB");
 
-    db::initialize_db(&conn).expect("failed to initialize DB");
+    db::initialize_db(&mut conn).expect("failed to initialize DB");
 
-    commands::execute(&cli, &conn).unwrap();
+    commands::execute(&cli, &mut conn).unwrap();
 
-    conn.close().expect("Failed to close DB")
+    conn.close().expect("Unable to close DB cleanly");
 }
