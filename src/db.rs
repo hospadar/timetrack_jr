@@ -24,9 +24,9 @@ pub struct Category {
     keys: Option<String>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct TimeWindow {
-    id: Option<u64>,
+    id: Option<i64>,
     category: String,
     start_time: u64,
     end_time: Option<u64>,
@@ -74,7 +74,7 @@ pub fn initialize_db(conn: &mut Connection) -> Result<(), TTError> {
     return Ok(());
 }
 
-pub fn get_options(conn: &Connection) -> Result<Options, TTError> {
+pub fn get_options(conn: &Transaction) -> Result<Options, TTError> {
     let mut options: Options = Options::new();
     let mut stmt = conn.prepare("SELECT name, value FROM options")?;
     let mut rows = stmt.query(())?;
@@ -86,7 +86,7 @@ pub fn get_options(conn: &Connection) -> Result<Options, TTError> {
     Ok(options)
 }
 
-pub fn get_categories(conn: &Connection) -> Result<Categories, TTError> {
+pub fn get_categories(conn: &Transaction) -> Result<Categories, TTError> {
     let mut categories = Categories::new();
     let mut stmt = conn.prepare("SELECT name, keys FROM categories order by name")?;
     let mut rows = stmt.query(())?;
@@ -104,29 +104,27 @@ pub fn get_categories(conn: &Connection) -> Result<Categories, TTError> {
     Ok(categories)
 }
 
-pub fn get_config(conn: &Connection) -> Result<Config, TTError> {
+pub fn get_config(conn: &Transaction) -> Result<Config, TTError> {
     return Ok(Config {
         options: get_options(conn)?,
         categories: get_categories(conn)?,
     });
 }
 
-pub fn add_category(conn: &Connection, category_name: &String) -> Result<(), TTError> {
+pub fn add_category(conn: &Transaction, category_name: &String) -> Result<(), TTError> {
     conn.execute("INSERT INTO categories (name) VALUES (?)", (category_name,))?;
     Ok(())
 }
 
 pub fn delete_category(
-    conn: &mut Connection,
+    tx: &Transaction,
     category_name: &String,
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
-    let tx = conn.transaction()?;
     if *delete_logged_times {
         tx.execute("DELETE FROM times WHERE category", (&category_name,))?;
     }
     tx.execute("DELETE FROM categories WHERE name=?", (&category_name,))?;
-    tx.commit()?;
 
     Ok(())
 }
@@ -164,6 +162,17 @@ pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError
     Ok(())
 }
 
+pub fn get_time(tx: &Transaction, id: i64) -> Result<TimeWindow, TTError> {
+    tx.query_row_and_then("SELECT * FROM times WHERE id=?", (id,), |row| {
+        Ok(TimeWindow {
+            id: Some(row.get("id").unwrap()),
+            category: row.get("category").unwrap(),
+            start_time: row.get("start_time").unwrap(),
+            end_time: row.get("end_time").unwrap(),
+        })
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use rusqlite::Connection;
@@ -174,21 +183,48 @@ mod tests {
     pub fn test_upsert() {
         let mut conn = Connection::open_in_memory().unwrap();
         initialize_db(&mut conn).unwrap();
-        add_category(&mut conn, &"work".to_string()).unwrap();
         let mut tx = conn.transaction().unwrap();
+        add_category(&tx, &"work".to_string()).unwrap();
         upsert_time(
             &mut tx,
             TimeWindow {
                 id: None,
                 category: "work".to_string(),
-                start_time: 0,
+                start_time: 47,
                 end_time: None,
             },
         )
         .unwrap();
 
-        let rowid = tx.last_insert_rowid();
+        assert_eq!(
+            Ok(TimeWindow {
+                id: Some(1),
+                category: "work".to_string(),
+                start_time: 47,
+                end_time: None
+            }),
+            get_time(&tx, tx.last_insert_rowid())
+        );
 
-        todo!("Need to check that our time actually got inserted correctly")
+        upsert_time(
+            &mut tx,
+            TimeWindow {
+                id: None,
+                category: "work".to_string(),
+                start_time: 51,
+                end_time: None,
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            Ok(TimeWindow {
+                id: Some(2),
+                category: "work".to_string(),
+                start_time: 51,
+                end_time: None
+            }),
+            get_time(&tx, tx.last_insert_rowid())
+        );
     }
 }

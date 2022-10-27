@@ -4,19 +4,20 @@ use regex::Regex;
 use rusqlite::Connection;
 
 pub fn show(conn: &mut Connection) -> Result<(), TTError> {
-    let config = db::get_config(conn)?;
+    let tx = conn.transaction()?;
+    let config = db::get_config(&tx)?;
     let json = match serde_json::to_string_pretty(&config) {
         Ok(j) => j,
         Err(error) => "Unable to serialize config: ".to_string() + error.to_string().as_str(),
     };
-
     println!("{}", json);
-
     Ok(())
 }
 
 pub fn add_category(conn: &mut Connection, category_name: &String) -> Result<(), TTError> {
-    db::add_category(conn, &category_name)?;
+    let tx = conn.transaction()?;
+    db::add_category(&tx, &category_name)?;
+    tx.commit()?;
     Ok(())
 }
 
@@ -25,7 +26,10 @@ pub fn delete_category(
     category_name: &String,
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
-    db::delete_category(conn, category_name, delete_logged_times)
+    let tx = conn.transaction()?;
+    db::delete_category(&tx, category_name, delete_logged_times)?;
+    tx.commit()?;
+    Ok(())
 }
 
 pub fn set_option(
