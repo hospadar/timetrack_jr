@@ -2,7 +2,20 @@ use clap::Parser;
 pub mod cli;
 pub mod commands;
 pub mod db;
-pub mod keyboard;
+
+pub type RusqliteError = rusqlite::Error;
+
+#[derive(Debug, PartialEq)]
+pub enum TTError {
+    SqlError(rusqlite::Error),
+    TTError { message: String },
+}
+
+impl From<rusqlite::Error> for TTError {
+    fn from(err: rusqlite::Error) -> Self {
+        TTError::SqlError(err)
+    }
+}
 
 fn main() {
     let cli = cli::Cli::parse();

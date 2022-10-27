@@ -23,16 +23,22 @@ pub enum Commands {
         #[command(subcommand)]
         log_command: LogCommands,
     },
-    ///Globally listen for key events to trigger time tracking
-    Listen {
-        #[arg(long, short)]
-        ical_file: Option<String>,
-        #[arg(long, short)]
-        csv_file: Option<String>,
-        #[arg(long, short)]
-        json_file: Option<String>,
-        #[arg(long, default_value = "-1")]
-        days_to_export: i64,
+    ///Export the DB to a more friendly format for analysis
+    Export {
+        ///Format of export to generate
+        #[arg(short, long, value_enum)]
+        format: ExportFormat,
+        ///Watch underlying DB for changes and re-export any time a change happens
+        #[arg(short, long)]
+        listen: bool,
+        ///Filename to export to - use `-` for stdout
+        #[arg(short, long, default_value = "-")]
+        outfile: String,
+        ///Earliest entries to include in the extract (defaults to everything)
+        #[arg(short, long)]
+        start_time: Option<String>,
+        ///Latest entries to include in the extract (defaults to everything)
+        end_time: Option<String>,
     },
 }
 
@@ -41,22 +47,17 @@ pub enum ConfigCommands {
     ///Show config options and currently-registered-categories
     Show,
     ///Create a new category that you can use for time tracking
-    AddCategory {
-        category_name: String,
-        #[arg(short, long)]
-        set_key_sequence: bool,
-    },
+    AddCategory { category_name: String },
     ///Delete a category
     DeleteCategory {
         category_name: String,
         #[arg(short, long)]
         delete_logged_times: bool,
     },
-    ///Set the key sequence to trigger the start of timing when using listen mode
-    SetKeySequence { category_name: String },
     ///Set a global option
     SetOption {
-        option_name: String,
+        #[arg(short, long, value_enum)]
+        option_name: OptionName,
         option_value: String,
     },
 }
@@ -70,10 +71,25 @@ pub enum LogCommands {
     AmendTime {
         time_id: u64,
         #[arg(short, long)]
-        start_time: String,
+        start_time: Option<String>,
         #[arg(short, long)]
-        end_time: String,
+        end_time: Option<String>,
         #[arg(short, long)]
-        category: String,
+        category: Option<String>,
     },
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum ExportFormat {
+    Json,
+    Csv,
+    Ical,
+    Summary,
+}
+
+#[derive(clap::ValueEnum, Clone, Debug)]
+pub enum OptionName {
+    StartOfDay,
+    EndOfDay,
+    DaysOfWeek,
 }

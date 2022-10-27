@@ -1,10 +1,10 @@
-use super::keyboard::Keypress;
+use crate::TTError;
+
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
-const PRETTY_INDENT: u16 = 2;
 
 #[derive(Serialize, Deserialize)]
 pub struct Config {
@@ -29,7 +29,7 @@ pub struct TimeWindow {
     end_time: Option<u64>,
 }
 
-pub fn initialize_db(conn: &Connection) -> Result<&Connection, rusqlite::Error> {
+pub fn initialize_db(conn: &Connection) -> Result<&Connection, TTError> {
     conn.execute("PRAGMA foreign_keys = ON", ())?;
 
     conn.execute("BEGIN", ())?;
@@ -72,7 +72,7 @@ pub fn initialize_db(conn: &Connection) -> Result<&Connection, rusqlite::Error> 
     return Result::Ok(&conn);
 }
 
-pub fn get_options(conn: &Connection) -> Result<Options, rusqlite::Error> {
+pub fn get_options(conn: &Connection) -> Result<Options, TTError> {
     let mut options: Options = Options::new();
     let mut stmt = conn.prepare("SELECT name, value FROM options")?;
     let mut rows = stmt.query(())?;
@@ -84,7 +84,7 @@ pub fn get_options(conn: &Connection) -> Result<Options, rusqlite::Error> {
     Ok(options)
 }
 
-pub fn get_categories(conn: &Connection) -> Result<Categories, rusqlite::Error> {
+pub fn get_categories(conn: &Connection) -> Result<Categories, TTError> {
     let mut categories = Categories::new();
     let mut stmt = conn.prepare("SELECT name, keys FROM categories order by name")?;
     let mut rows = stmt.query(())?;
@@ -102,25 +102,15 @@ pub fn get_categories(conn: &Connection) -> Result<Categories, rusqlite::Error> 
     Ok(categories)
 }
 
-pub fn get_config(conn: &Connection) -> Result<Config, rusqlite::Error> {
+pub fn get_config(conn: &Connection) -> Result<Config, TTError> {
     return Ok(Config {
         options: get_options(conn)?,
         categories: get_categories(conn)?,
     });
 }
 
-pub fn add_category(
-    conn: &Connection,
-    category_name: &String,
-    keys: Option<Keypress>,
-) -> Result<(), rusqlite::Error> {
-    match keys {
-        Some(keys) => conn.execute(
-            "INSERT INTO categories (name, keys) VALUES (?,?)",
-            (category_name, format!("{}", keys)),
-        )?,
-        None => conn.execute("INSERT INTO categories (name) VALUES (?)", (category_name,))?,
-    };
+pub fn add_category(conn: &Connection, category_name: &String) -> Result<(), TTError> {
+    conn.execute("INSERT INTO categories (name) VALUES (?)", (category_name,))?;
     Ok(())
 }
 
@@ -128,7 +118,7 @@ pub fn delete_category(
     conn: &Connection,
     category_name: &String,
     delete_logged_times: &bool,
-) -> Result<(), rusqlite::Error> {
+) -> Result<(), TTError> {
     conn.execute("BEGIN", ())?;
     if *delete_logged_times {
         conn.execute("DELETE FROM times WHERE category", (&category_name,))?;
