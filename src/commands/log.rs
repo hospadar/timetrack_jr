@@ -1,12 +1,21 @@
+use crate::{cli, db, TTError};
 use rusqlite::Connection;
-
-use crate::TTError;
 
 pub fn start_timing(conn: &Connection, category_name: &String) -> Result<(), TTError> {
     todo!()
 }
 
-pub fn stop_timing(conn: &Connection) -> Result<(), TTError> {
+pub fn stop_timing(conn: &mut Connection) -> Result<(), TTError> {
+    let tx = conn.transaction()?;
+
+    let opts = db::get_options(&tx)?;
+
+    if let (Some(start), Some(end)) = (opts.get("start-of-day"), opts.get("end-of-day")) {
+        if let (start, end) = (db::parse_time(start), db::parse_time(end)) {
+            if (start != end) {}
+        }
+    }
+
     todo!()
 }
 
