@@ -236,36 +236,58 @@ pub fn parse_time(time_string: &String) -> Result<HourMinute, TTError> {
     }
 }
 
-pub fn end_open_times(tx: &mut Transaction, end_of_business: HourMinute) -> Result<(), TTError> {
-    let sp = tx.savepoint()?;
+pub fn end_open_times(
+    tx: &mut Transaction,
+    start_of_business: HourMinute,
+    end_of_business: HourMinute,
+) -> Result<(), TTError> {
+    let mut updated_times: Vec<TimeWindow> = vec![];
+    {
+        let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL LIMIT")?;
 
-    let mut stmt = sp.prepare("SELECT * FROM times WHERE end_time IS NULL LIMIT 1")?;
+        let mut results = stmt.query(())?;
 
-    let mut results = stmt.query(())?;
+        while let Some(row) = results.next()? {
+            let mut logged_time = rowToTimeWindow(row)?;
+            let mut date: DateTime<chrono::Local> = DateTime::from_utc(
+                NaiveDateTime::from_timestamp(logged_time.start_time, 0),
+                *chrono::Local::now().offset(),
+            );
 
-    while let Some(row) = results.next()? {
-        let mut logged_time = rowToTimeWindow(row)?;
-        let date: DateTime<chrono::Local> = DateTime::from_utc(
-            NaiveDateTime::from_timestamp(logged_time.start_time, 0),
-            *chrono::Local::now().offset(),
-        );
+            let hm = HourMinute(date.hour(), date.minute());
 
-        let hm = HourMinute(date.hour(), date.minute());
+            if hm.to_string() >= start_of_business.to_string()
+                && hm.to_string() < end_of_business.to_string()
+            {
+                date = date
+                    .with_hour(end_of_business.0)
+                    .unwrap()
+                    .with_minute(end_of_business.1)
+                    .unwrap();
+            } else {
+                date = date
+                    .with_hour(start_of_business.0)
+                    .unwrap()
+                    .with_minute(start_of_business.1)
+                    .unwrap()
+                    + chrono::Duration::days(1);
+            }
 
-        let mut end_date = date
-            .with_hour(end_of_business.0)
-            .unwrap()
-            .with_minute(end_of_business.1)
-            .unwrap();
+            logged_time.end_time = Some(date.timestamp());
 
-        if hm.to_string() >= end_of_business.to_string() {
-            end_date = end_date + chrono::Duration::days(1);
+            updated_times.push(logged_time);
         }
-
-        logged_time.end_time = Some(end_date.timestamp());
-
-        upsert_time(tx, logged_time)?;
     }
+
+    for time in updated_times {
+        upsert_time(tx, time)?;
+    }
+
+    Ok(())
+}
+
+pub fn end_open_times_immediately(tx: &mut Transaction) -> Result<(), TTError> {
+    tx.execute("UPDATE times SET end_time = ? WHERE end_time is null ", ())?;
 
     Ok(())
 }

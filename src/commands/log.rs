@@ -6,17 +6,19 @@ pub fn start_timing(conn: &Connection, category_name: &String) -> Result<(), TTE
 }
 
 pub fn stop_timing(conn: &mut Connection) -> Result<(), TTError> {
-    let tx = conn.transaction()?;
+    let mut tx = conn.transaction()?;
 
     let opts = db::get_options(&tx)?;
 
     if let (Some(start), Some(end)) = (opts.get("start-of-day"), opts.get("end-of-day")) {
-        if let (start, end) = (db::parse_time(start), db::parse_time(end)) {
-            if (start != end) {}
+        if let (Ok(start), Ok(end)) = (db::parse_time(start), db::parse_time(end)) {
+            if start != end {
+                return db::end_open_times(&mut tx, start, end);
+            }
         }
     }
 
-    todo!()
+    return db::end_open_times_immediately(&mut tx);
 }
 
 pub fn amend_time(
