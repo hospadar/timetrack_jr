@@ -9,16 +9,18 @@ pub fn stop_timing(conn: &mut Connection) -> Result<(), TTError> {
     let mut tx = conn.transaction()?;
 
     let opts = db::get_options(&tx)?;
-
+    let mut done = false;
     if let (Some(start), Some(end)) = (opts.get("start-of-day"), opts.get("end-of-day")) {
         if let (Ok(start), Ok(end)) = (db::parse_time(start), db::parse_time(end)) {
             if start != end {
-                return db::end_open_times(&mut tx, start, end);
+                db::end_open_times(&mut tx, start, end)?;
+                done = true;
             }
         }
     }
-
-    return db::end_open_times_immediately(&mut tx);
+    //if valid options for start and end were set, this will be a no-op
+    db::end_open_times_immediately(&mut tx)?;
+    return Ok(tx.commit()?);
 }
 
 pub fn amend_time(
