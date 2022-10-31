@@ -18,8 +18,9 @@ pub fn stop_timing(conn: &mut Connection) -> Result<(), TTError> {
             }
         }
     }
-    //if valid options for start and end were set, this will be a no-op
-    db::end_open_times_immediately(&mut tx)?;
+    if !done {
+        db::end_open_times_immediately(&mut tx)?;
+    }
     return Ok(tx.commit()?);
 }
 
