@@ -1,4 +1,5 @@
 use crate::TTError;
+use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Timelike};
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rusqlite::{
@@ -8,6 +9,8 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
+    result,
+    time::Instant,
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -31,15 +34,30 @@ pub struct Category {
 pub struct TimeWindow {
     id: Option<i64>,
     category: String,
-    start_time: u64,
-    end_time: Option<u64>,
+    start_time: i64,
+    end_time: Option<i64>,
+}
+
+fn rowToTimeWindow(row: &Row) -> Result<TimeWindow, rusqlite::Error> {
+    Ok(TimeWindow {
+        id: row.get("id")?,
+        category: row.get("category")?,
+        start_time: row.get("start_time")?,
+        end_time: row.get("end_time")?,
+    })
 }
 
 static BUSINESS_HOURS_PATTERN: Lazy<Regex> =
     Lazy::new(|| Regex::new("^(?P<hour>\\d{1,2}):(?P<minute>\\d{1,2})").unwrap());
 
 #[derive(Eq, PartialEq, Debug)]
-pub struct HourMinute(u8, u8);
+pub struct HourMinute(u32, u32);
+
+impl std::fmt::Display for HourMinute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:02}:{:02}", self.0, self.1)
+    }
+}
 
 pub fn initialize_db(conn: &mut Connection) -> Result<(), TTError> {
     conn.execute("PRAGMA foreign_keys = ON", ())?;
@@ -190,13 +208,13 @@ pub fn parse_time(time_string: &String) -> Result<HourMinute, TTError> {
             .name("hour")
             .unwrap()
             .as_str()
-            .parse::<u8>()
+            .parse::<u32>()
             .unwrap();
         let minute = capture
             .name("minute")
             .unwrap()
             .as_str()
-            .parse::<u8>()
+            .parse::<u32>()
             .unwrap();
 
         if (hour > 23) {
@@ -218,26 +236,38 @@ pub fn parse_time(time_string: &String) -> Result<HourMinute, TTError> {
     }
 }
 
-pub fn get_open_times<'a>(tx: &'a Transaction) -> Result<Vec<TimeWindow>, TTError> {
-    let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL")?;
+pub fn end_open_times(tx: &mut Transaction, end_of_business: HourMinute) -> Result<(), TTError> {
+    let sp = tx.savepoint()?;
 
-    let results = rusqlite::Statement::query(&mut stmt, ())?;
+    let mut stmt = sp.prepare("SELECT * FROM times WHERE end_time IS NULL LIMIT 1")?;
 
-    let mapped = results.mapped(|row| {
-        Ok(TimeWindow {
-            id: row.get("id")?,
-            category: row.get("category")?,
-            start_time: row.get("start_time")?,
-            end_time: row.get("end_time")?,
-        })
-    });
+    let mut results = stmt.query(())?;
 
-    let mut allRows: Vec<TimeWindow> = vec![];
-    for row in mapped {
-        allRows.push(row?);
+    while let Some(row) = results.next()? {
+        let mut logged_time = rowToTimeWindow(row)?;
+        let date: DateTime<chrono::Local> = DateTime::from_utc(
+            NaiveDateTime::from_timestamp(logged_time.start_time, 0),
+            *chrono::Local::now().offset(),
+        );
+
+        let hm = HourMinute(date.hour(), date.minute());
+
+        let mut end_date = date
+            .with_hour(end_of_business.0)
+            .unwrap()
+            .with_minute(end_of_business.1)
+            .unwrap();
+
+        if hm.to_string() >= end_of_business.to_string() {
+            end_date = end_date + chrono::Duration::days(1);
+        }
+
+        logged_time.end_time = Some(end_date.timestamp());
+
+        upsert_time(tx, logged_time)?;
     }
 
-    Ok(allRows)
+    Ok(())
 }
 
 #[cfg(test)]
@@ -245,6 +275,13 @@ mod tests {
     use rusqlite::Connection;
 
     use super::*;
+
+    #[test]
+    fn test_hour_minute_format() {
+        assert_eq!("01:01", HourMinute(1, 1).to_string());
+        assert_eq!("12:01", HourMinute(12, 1).to_string());
+        assert_eq!("12:12", HourMinute(12, 12).to_string());
+    }
 
     #[test]
     fn test_re() {
