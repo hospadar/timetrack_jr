@@ -1,3 +1,5 @@
+use std::time::{Duration, SystemTimeError};
+
 use clap::Parser;
 pub mod cli;
 pub mod commands;
@@ -8,12 +10,19 @@ pub type RusqliteError = rusqlite::Error;
 #[derive(Debug, PartialEq)]
 pub enum TTError {
     SqlError(rusqlite::Error),
+    SystemTimeError(Duration),
     TTError { message: String },
 }
 
 impl From<rusqlite::Error> for TTError {
     fn from(err: rusqlite::Error) -> Self {
         TTError::SqlError(err)
+    }
+}
+
+impl From<SystemTimeError> for TTError {
+    fn from(err: SystemTimeError) -> Self {
+        TTError::SystemTimeError(err.duration())
     }
 }
 

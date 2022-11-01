@@ -1,4 +1,4 @@
-use crate::{cli, db, TTError};
+use crate::{db, TTError};
 use rusqlite::Connection;
 
 pub fn start_timing(conn: &Connection, category_name: &String) -> Result<(), TTError> {

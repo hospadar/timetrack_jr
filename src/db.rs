@@ -10,7 +10,7 @@ use std::{
     collections::BTreeMap,
     ops::{Deref, DerefMut},
     result,
-    time::Instant,
+    time::{Instant, SystemTime, UNIX_EPOCH},
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -38,7 +38,7 @@ pub struct TimeWindow {
     end_time: Option<i64>,
 }
 
-fn rowToTimeWindow(row: &Row) -> Result<TimeWindow, rusqlite::Error> {
+fn row_to_time_window(row: &Row) -> Result<TimeWindow, rusqlite::Error> {
     Ok(TimeWindow {
         id: row.get("id")?,
         category: row.get("category")?,
@@ -248,7 +248,7 @@ pub fn end_open_times(
         let mut results = stmt.query(())?;
 
         while let Some(row) = results.next()? {
-            let mut logged_time = rowToTimeWindow(row)?;
+            let mut logged_time = row_to_time_window(row)?;
             let mut date: DateTime<chrono::Local> = DateTime::from_utc(
                 NaiveDateTime::from_timestamp(logged_time.start_time, 0),
                 *chrono::Local::now().offset(),
@@ -287,16 +287,70 @@ pub fn end_open_times(
 }
 
 pub fn end_open_times_immediately(tx: &mut Transaction) -> Result<(), TTError> {
-    tx.execute("UPDATE times SET end_time = ? WHERE end_time is null ", ())?;
+    tx.execute(
+        "UPDATE times SET end_time = ? WHERE end_time is null ",
+        (SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_secs(),),
+    )?;
 
-    Ok(())
+    return Ok(());
+}
+
+pub fn start_timing(tx: &mut Transaction, category: &String) -> Result<(), TTError> {
+    upsert_time(
+        tx,
+        TimeWindow {
+            id: None,
+            category: category.clone(),
+            start_time: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs() as i64,
+            end_time: None,
+        },
+    )
 }
 
 #[cfg(test)]
 mod tests {
+    use std::{thread::Thread, time::Duration};
+
     use rusqlite::Connection;
 
     use super::*;
+
+    fn get_initialized_db() -> Connection {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_db(&mut conn).unwrap();
+        return conn;
+    }
+
+    #[test]
+    fn test_timing() {
+        let mut conn = get_initialized_db();
+        {
+            let mut tx = conn.transaction().unwrap();
+            assert!(start_timing(&mut tx, &"work".to_string()).is_err());
+
+            add_category(&mut tx, &"work".to_string()).unwrap();
+
+            assert!(start_timing(&mut tx, &"work".to_string()).is_ok());
+            let time = get_time(&tx, 1).unwrap();
+            assert_eq!(Some(1), time.id);
+            assert_eq!("work".to_string(), time.category);
+            assert_eq!(None, time.end_time);
+
+            std::thread::sleep(Duration::from_secs(1));
+
+            end_open_times_immediately(&mut tx).unwrap();
+            let time = get_time(&tx, 1).unwrap();
+            assert_eq!(Some(1), time.id);
+            assert_eq!("work".to_string(), time.category);
+            assert!(time.end_time.is_some());
+            assert!(time.end_time.unwrap() > time.start_time);
+
+            todo!("Check that end_open_times stops timing EITHER at the next business hour, OR at the current time");
+        }
+        conn.close().unwrap();
+    }
 
     #[test]
     fn test_hour_minute_format() {
@@ -395,71 +449,73 @@ mod tests {
 
     #[test]
     pub fn test_upsert() {
-        let mut conn = Connection::open_in_memory().unwrap();
-        initialize_db(&mut conn).unwrap();
-        let mut tx = conn.transaction().unwrap();
-        add_category(&tx, &"work".to_string()).unwrap();
-        upsert_time(
-            &mut tx,
-            TimeWindow {
-                id: None,
-                category: "work".to_string(),
-                start_time: 47,
-                end_time: None,
-            },
-        )
-        .unwrap();
+        let mut conn = get_initialized_db();
+        {
+            let mut tx = conn.transaction().unwrap();
+            add_category(&tx, &"work".to_string()).unwrap();
+            upsert_time(
+                &mut tx,
+                TimeWindow {
+                    id: None,
+                    category: "work".to_string(),
+                    start_time: 47,
+                    end_time: None,
+                },
+            )
+            .unwrap();
 
-        assert_eq!(
-            Ok(TimeWindow {
-                id: Some(1),
-                category: "work".to_string(),
-                start_time: 47,
-                end_time: None
-            }),
-            get_time(&tx, tx.last_insert_rowid())
-        );
+            assert_eq!(
+                Ok(TimeWindow {
+                    id: Some(1),
+                    category: "work".to_string(),
+                    start_time: 47,
+                    end_time: None
+                }),
+                get_time(&tx, tx.last_insert_rowid())
+            );
 
-        upsert_time(
-            &mut tx,
-            TimeWindow {
-                id: None,
-                category: "work".to_string(),
-                start_time: 51,
-                end_time: None,
-            },
-        )
-        .unwrap();
+            upsert_time(
+                &mut tx,
+                TimeWindow {
+                    id: None,
+                    category: "work".to_string(),
+                    start_time: 51,
+                    end_time: None,
+                },
+            )
+            .unwrap();
 
-        assert_eq!(
-            Ok(TimeWindow {
-                id: Some(2),
-                category: "work".to_string(),
-                start_time: 51,
-                end_time: None
-            }),
-            get_time(&tx, tx.last_insert_rowid())
-        );
+            assert_eq!(
+                Ok(TimeWindow {
+                    id: Some(2),
+                    category: "work".to_string(),
+                    start_time: 51,
+                    end_time: None
+                }),
+                get_time(&tx, tx.last_insert_rowid())
+            );
 
-        upsert_time(
-            &mut tx,
-            TimeWindow {
-                id: Some(2),
-                category: "work".to_string(),
-                start_time: 111,
-                end_time: Some(112),
-            },
-        )
-        .unwrap();
+            upsert_time(
+                &mut tx,
+                TimeWindow {
+                    id: Some(2),
+                    category: "work".to_string(),
+                    start_time: 111,
+                    end_time: Some(112),
+                },
+            )
+            .unwrap();
 
-        assert_eq!(
-            Ok(TimeWindow {
-                id: Some(2),
-                category: "work".to_string(),
-                start_time: 111,
-                end_time: Some(112)
-            }),
-            get_time(&tx, tx.last_insert_rowid())
-        );
+            assert_eq!(
+                Ok(TimeWindow {
+                    id: Some(2),
+                    category: "work".to_string(),
+                    start_time: 111,
+                    end_time: Some(112)
+                }),
+                get_time(&tx, tx.last_insert_rowid())
+            );
+        }
+        conn.close().unwrap();
     }
 }
