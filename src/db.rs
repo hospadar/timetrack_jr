@@ -59,6 +59,18 @@ impl std::fmt::Display for HourMinute {
     }
 }
 
+impl std::cmp::Ord for HourMinute {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.to_string().cmp(&other.to_string())
+    }
+}
+
+impl std::cmp::PartialOrd for HourMinute {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.to_string().partial_cmp(&other.to_string())
+    }
+}
+
 pub fn initialize_db(conn: &mut Connection) -> Result<(), TTError> {
     conn.execute("PRAGMA foreign_keys = ON", ())?;
 
@@ -236,44 +248,39 @@ pub fn parse_time(time_string: &String) -> Result<HourMinute, TTError> {
     }
 }
 
-pub fn end_open_times(
-    tx: &mut Transaction,
-    start_of_business: HourMinute,
-    end_of_business: HourMinute,
-) -> Result<(), TTError> {
+///End any times which don't have a recorded end time.
+/// End times are set to the lesser of <current time> <next EOB (relative to start time)>
+pub fn end_open_times(tx: &mut Transaction, end_of_business: HourMinute) -> Result<(), TTError> {
     let mut updated_times: Vec<TimeWindow> = vec![];
     {
-        let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL LIMIT")?;
+        let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL")?;
 
         let mut results = stmt.query(())?;
 
         while let Some(row) = results.next()? {
             let mut logged_time = row_to_time_window(row)?;
-            let mut date: DateTime<chrono::Local> = DateTime::from_utc(
+            let start_date: DateTime<chrono::Local> = DateTime::from_utc(
                 NaiveDateTime::from_timestamp(logged_time.start_time, 0),
                 *chrono::Local::now().offset(),
             );
 
-            let hm = HourMinute(date.hour(), date.minute());
-
-            if hm.to_string() >= start_of_business.to_string()
-                && hm.to_string() < end_of_business.to_string()
-            {
-                date = date
-                    .with_hour(end_of_business.0)
-                    .unwrap()
-                    .with_minute(end_of_business.1)
-                    .unwrap();
-            } else {
-                date = date
-                    .with_hour(start_of_business.0)
-                    .unwrap()
-                    .with_minute(start_of_business.1)
-                    .unwrap()
-                    + chrono::Duration::days(1);
+            //calculate the first EOB datetime that is AFTER the logged start time
+            //set the hour and minute to EOB
+            let mut end_date = start_date
+                .clone()
+                .with_hour(end_of_business.0)
+                .unwrap()
+                .with_minute(end_of_business.1)
+                .unwrap();
+            //if the end_date is before the start date (i.e. if the hour/minute of the start time is AFTER EOB)
+            //then bump out the date by one day for the end time
+            if end_date <= start_date {
+                end_date += chrono::Duration::days(1);
             }
 
-            logged_time.end_time = Some(date.timestamp());
+            let now_date = chrono::Local::now();
+
+            logged_time.end_time = Some(std::cmp::min(end_date, now_date).timestamp());
 
             updated_times.push(logged_time);
         }
@@ -313,6 +320,7 @@ pub fn start_timing(tx: &mut Transaction, category: &String) -> Result<(), TTErr
 mod tests {
     use std::{thread::Thread, time::Duration};
 
+    use chrono::{NaiveDate, Offset};
     use rusqlite::Connection;
 
     use super::*;
@@ -333,7 +341,7 @@ mod tests {
             add_category(&mut tx, &"work".to_string()).unwrap();
 
             assert!(start_timing(&mut tx, &"work".to_string()).is_ok());
-            let time = get_time(&tx, 1).unwrap();
+            let mut time = get_time(&tx, 1).unwrap();
             assert_eq!(Some(1), time.id);
             assert_eq!("work".to_string(), time.category);
             assert_eq!(None, time.end_time);
@@ -341,13 +349,69 @@ mod tests {
             std::thread::sleep(Duration::from_secs(1));
 
             end_open_times_immediately(&mut tx).unwrap();
-            let time = get_time(&tx, 1).unwrap();
+            time = get_time(&tx, 1).unwrap();
             assert_eq!(Some(1), time.id);
             assert_eq!("work".to_string(), time.category);
             assert!(time.end_time.is_some());
             assert!(time.end_time.unwrap() > time.start_time);
 
-            todo!("Check that end_open_times stops timing EITHER at the next business hour, OR at the current time");
+            //un-set the end time
+            let start_datetime = DateTime::<chrono::Local>::from_local(
+                NaiveDate::from_ymd(2020, 12, 31).and_hms(12, 12, 0),
+                *chrono::Local::now().offset(),
+            );
+            time.end_time = None;
+            time.start_time = start_datetime.timestamp();
+            upsert_time(&mut tx, time).unwrap();
+
+            end_open_times(&mut tx, HourMinute(13, 0)).unwrap();
+
+            time = get_time(&tx, 1).unwrap();
+
+            //should have been ended at EOB
+            assert_eq!(
+                time.end_time.unwrap(),
+                start_datetime
+                    .with_hour(13)
+                    .unwrap()
+                    .with_minute(0)
+                    .unwrap()
+                    .timestamp()
+            );
+
+            //What if EOB is less than start time
+            time = get_time(&tx, 1).unwrap();
+            time.end_time = None;
+            upsert_time(&mut tx, time).unwrap();
+            end_open_times(&mut tx, HourMinute(11, 0)).unwrap();
+            time = get_time(&tx, 1).unwrap();
+            //should have been ended at EOB the next day
+            assert_eq!(
+                time.end_time.unwrap(),
+                (start_datetime
+                    .with_hour(11)
+                    .unwrap()
+                    .with_minute(0)
+                    .unwrap()
+                    + chrono::Duration::days(1))
+                .timestamp()
+            );
+
+            //what if current time is less than next EOB?
+            //What if EOB is less than start time
+            time = get_time(&tx, 1).unwrap();
+            time.end_time = None;
+            let start_datetime = chrono::Local::now();
+            let mut eob = HourMinute(0, 0);
+            if start_datetime.hour() == 0 {
+                eob.0 = 23
+            }
+            time.start_time = start_datetime.timestamp();
+            upsert_time(&mut tx, time).unwrap();
+            end_open_times(&mut tx, eob).unwrap();
+            time = get_time(&tx, 1).unwrap();
+            //should have been ended at EOB the next day
+            assert!(start_datetime.timestamp() - time.end_time.unwrap() < 10,);
         }
         conn.close().unwrap();
     }

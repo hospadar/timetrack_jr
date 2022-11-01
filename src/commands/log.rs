@@ -13,7 +13,7 @@ pub fn stop_timing(conn: &mut Connection) -> Result<(), TTError> {
     if let (Some(start), Some(end)) = (opts.get("start-of-day"), opts.get("end-of-day")) {
         if let (Ok(start), Ok(end)) = (db::parse_time(start), db::parse_time(end)) {
             if start != end {
-                db::end_open_times(&mut tx, start, end)?;
+                db::end_open_times(&mut tx, end)?;
                 done = true;
             }
         }
