@@ -21,6 +21,7 @@ pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
                 option_name,
                 option_value,
             } => config::set_option(conn, option_name, option_value),
+            ConfigCommands::UnSetOption { option_name } => todo!(),
         },
         Commands::Log { log_command } => match log_command {
             LogCommands::StartTiming { category_name } => log::start_timing(conn, category_name),

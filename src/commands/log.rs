@@ -19,7 +19,7 @@ fn stop_timing_private(tx: &mut Transaction) -> Result<(), TTError> {
 pub fn start_timing(conn: &mut Connection, category_name: &String) -> Result<(), TTError> {
     let mut tx = conn.transaction()?;
     let categories = db::get_categories(&mut tx)?;
-    if !categories.contains_key(category_name) {
+    if !categories.contains(category_name) {
         return Err(TTError::TTError { message: format!("Category '{}' does not exist in the timetrack jr database, use `ttjr add-category` to add it", category_name) });
     }
     stop_timing_private(&mut tx)?;

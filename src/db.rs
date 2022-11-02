@@ -7,7 +7,7 @@ use rusqlite::{
 };
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     ops::{Deref, DerefMut},
     result,
     time::{Instant, SystemTime, UNIX_EPOCH},
@@ -22,13 +22,7 @@ pub struct Config {
 }
 
 pub type Options = BTreeMap<String, String>;
-pub type Categories = BTreeMap<String, Category>;
-
-#[derive(Serialize, Deserialize)]
-pub struct Category {
-    name: String,
-    keys: Option<String>,
-}
+pub type Categories = BTreeSet<String>;
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct TimeWindow {
@@ -127,17 +121,11 @@ pub fn get_options(conn: &Transaction) -> Result<Options, TTError> {
 
 pub fn get_categories(conn: &Transaction) -> Result<Categories, TTError> {
     let mut categories = Categories::new();
-    let mut stmt = conn.prepare("SELECT name, keys FROM categories order by name")?;
+    let mut stmt = conn.prepare("SELECT name FROM categories order by name")?;
     let mut rows = stmt.query(())?;
 
     while let Some(row) = rows.next()? {
-        categories.insert(
-            row.get(0)?,
-            Category {
-                name: row.get(0)?,
-                keys: row.get(1)?,
-            },
-        );
+        categories.insert(row.get(0)?);
     }
 
     Ok(categories)
