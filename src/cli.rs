@@ -60,6 +60,11 @@ pub enum ConfigCommands {
         option_name: OptionName,
         option_value: String,
     },
+
+    UnSetOption {
+        #[arg(short, long, value_enum)]
+        option_name: OptionName,
+    },
 }
 
 #[derive(Subcommand, Debug)]
