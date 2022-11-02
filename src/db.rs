@@ -32,10 +32,10 @@ pub struct Category {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
 pub struct TimeWindow {
-    id: Option<i64>,
-    category: String,
-    start_time: i64,
-    end_time: Option<i64>,
+    pub id: Option<i64>,
+    pub category: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
 }
 
 fn row_to_time_window(row: &Row) -> Result<TimeWindow, rusqlite::Error> {
@@ -410,7 +410,7 @@ mod tests {
             upsert_time(&mut tx, time).unwrap();
             end_open_times(&mut tx, eob).unwrap();
             time = get_time(&tx, 1).unwrap();
-            //should have been ended at EOB the next day
+            //should have been ended nowish not EOB
             assert!(start_datetime.timestamp() - time.end_time.unwrap() < 10,);
         }
         conn.close().unwrap();

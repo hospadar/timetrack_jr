@@ -1,4 +1,7 @@
-use std::time::{Duration, SystemTimeError};
+use std::{
+    num::ParseIntError,
+    time::{Duration, SystemTimeError},
+};
 
 use clap::Parser;
 pub mod cli;
@@ -11,7 +14,14 @@ pub type RusqliteError = rusqlite::Error;
 pub enum TTError {
     SqlError(rusqlite::Error),
     SystemTimeError(Duration),
+    ParseIntError(ParseIntError),
     TTError { message: String },
+}
+
+impl From<ParseIntError> for TTError {
+    fn from(err: ParseIntError) -> Self {
+        TTError::ParseIntError(err)
+    }
 }
 
 impl From<rusqlite::Error> for TTError {

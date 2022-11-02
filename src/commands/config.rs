@@ -36,8 +36,6 @@ pub fn set_option(
     option_value: &String,
 ) -> Result<(), TTError> {
     match option_name {
-        OptionName::StartOfDay => todo!(),
         OptionName::EndOfDay => todo!(),
-        OptionName::DaysOfWeek => todo!(),
     }
 }

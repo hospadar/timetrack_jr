@@ -69,7 +69,7 @@ pub enum LogCommands {
     },
     StopTiming,
     AmendTime {
-        time_id: u64,
+        time_id: i64,
         #[arg(short, long)]
         start_time: Option<String>,
         #[arg(short, long)]
@@ -89,7 +89,5 @@ pub enum ExportFormat {
 
 #[derive(clap::ValueEnum, Clone, Debug)]
 pub enum OptionName {
-    StartOfDay,
     EndOfDay,
-    DaysOfWeek,
 }
