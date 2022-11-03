@@ -47,7 +47,9 @@ pub enum ConfigCommands {
     ///Show config options and currently-registered-categories
     Show,
     ///Create a new category that you can use for time tracking
-    AddCategory { category_name: String },
+    AddCategory {
+        category_name: String,
+    },
     ///Delete a category
     DeleteCategory {
         category_name: String,
@@ -56,13 +58,11 @@ pub enum ConfigCommands {
     },
     ///Set a global option
     SetOption {
-        #[arg(short, long, value_enum)]
         option_name: OptionName,
         option_value: String,
     },
 
-    UnSetOption {
-        #[arg(short, long, value_enum)]
+    UnsetOption {
         option_name: OptionName,
     },
 }

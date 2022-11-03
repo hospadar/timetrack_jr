@@ -1,5 +1,6 @@
-use crate::TTError;
+use crate::{cli, TTError};
 use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Timelike};
+use clap::ValueEnum;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rusqlite::{
@@ -105,6 +106,38 @@ pub fn initialize_db(conn: &mut Connection) -> Result<(), TTError> {
     tx.commit()?;
 
     return Ok(());
+}
+
+pub fn set_option(
+    tx: &Transaction,
+    option_name: &cli::OptionName,
+    option_value: &String,
+) -> Result<(), TTError> {
+    if let Some(option_name) = ValueEnum::to_possible_value(option_name) {
+        tx.execute(
+            "REPLACE INTO options (name, value) VALUES (?, ?)",
+            (option_name.get_name(), option_value),
+        )?;
+        Ok(())
+    } else {
+        Err(TTError::TTError {
+            message: format!("Unknown Option Name {:?}", option_name),
+        })
+    }
+}
+
+pub fn unset_option(tx: &Transaction, option_name: &cli::OptionName) -> Result<(), TTError> {
+    if let Some(option_name) = ValueEnum::to_possible_value(option_name) {
+        tx.execute(
+            "DELETE FROM options WHERE name = ?",
+            (option_name.get_name(),),
+        )?;
+        Ok(())
+    } else {
+        Err(TTError::TTError {
+            message: format!("Unknown Option Name {:?}", option_name),
+        })
+    }
 }
 
 pub fn get_options(conn: &Transaction) -> Result<Options, TTError> {

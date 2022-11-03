@@ -2,6 +2,8 @@ use crate::cli::{Cli, Commands, ConfigCommands, LogCommands};
 use crate::TTError;
 use rusqlite::Connection;
 
+use self::config::unset_option;
+
 mod config;
 mod export;
 mod log;
@@ -21,7 +23,7 @@ pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
                 option_name,
                 option_value,
             } => config::set_option(conn, option_name, option_value),
-            ConfigCommands::UnSetOption { option_name } => todo!(),
+            ConfigCommands::UnsetOption { option_name } => unset_option(conn, option_name),
         },
         Commands::Log { log_command } => match log_command {
             LogCommands::StartTiming { category_name } => log::start_timing(conn, category_name),

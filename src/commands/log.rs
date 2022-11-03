@@ -52,5 +52,7 @@ pub fn amend_time(
         time.category = category.clone();
     }
 
-    db::upsert_time(&mut tx, time)
+    db::upsert_time(&mut tx, time)?;
+    tx.commit()?;
+    Ok(())
 }

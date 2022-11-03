@@ -1,4 +1,5 @@
 use crate::{cli::OptionName, db, TTError};
+use clap::ValueEnum;
 use rusqlite::Connection;
 
 pub fn show(conn: &mut Connection) -> Result<(), TTError> {
@@ -35,7 +36,22 @@ pub fn set_option(
     option_name: &OptionName,
     option_value: &String,
 ) -> Result<(), TTError> {
+    //validate option values if necessary
     match option_name {
-        OptionName::EndOfDay => todo!(),
+        OptionName::EndOfDay => {
+            //check that end of day has correct format
+            db::parse_time(option_value)?;
+        }
     }
+    let tx = conn.transaction()?;
+    db::set_option(&tx, option_name, option_value)?;
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn unset_option(conn: &mut Connection, option_name: &OptionName) -> Result<(), TTError> {
+    let tx = conn.transaction()?;
+    db::unset_option(&tx, option_name)?;
+    tx.commit()?;
+    Ok(())
 }
