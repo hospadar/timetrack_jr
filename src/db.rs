@@ -337,6 +337,45 @@ pub fn start_timing(tx: &mut Transaction, category: &String) -> Result<(), TTErr
     )
 }
 
+pub fn get_times(
+    tx: &mut Transaction,
+    start_date: Option<i64>,
+    end_date: Option<i64>,
+) -> Result<Vec<TimeWindow>, TTError> {
+    let mut clauses = Vec::<&str>::new();
+    let mut values: Vec<&dyn ToSql> = vec![];
+    let mut where_clause = String::new();
+    if let Some(start) = &start_date {
+        clauses.push("start_time >= ?");
+        values.push(start);
+    }
+    if let Some(end) = &end_date {
+        clauses.push("start_time <= ?");
+        values.push(end);
+    }
+
+    if values.len() > 0 {
+        where_clause = format!("WHERE {}", clauses.join(" AND "));
+    }
+
+    let mut stmt = tx.prepare(&format!(
+        "SELECT id, category, start_time, end_time FROM times {}",
+        where_clause
+    ))?;
+
+    for i in 1..(values.len() + 1) {
+        stmt.raw_bind_parameter(i, values.get(i - 1).unwrap())?;
+    }
+    let rows = stmt.raw_query().mapped(|row| row_to_time_window(row));
+    let mut times: Vec<TimeWindow> = Vec::new();
+
+    for row in rows {
+        times.push(row?)
+    }
+
+    return Ok(times);
+}
+
 #[cfg(test)]
 mod tests {
     use std::{thread::Thread, time::Duration};

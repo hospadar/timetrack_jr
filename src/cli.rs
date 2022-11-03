@@ -38,6 +38,7 @@ pub enum Commands {
         #[arg(short, long)]
         start_time: Option<String>,
         ///Latest entries to include in the extract (defaults to everything)
+        #[arg(short, long)]
         end_time: Option<String>,
     },
 }

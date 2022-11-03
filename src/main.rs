@@ -1,5 +1,6 @@
 use clap::Parser;
 use std::{
+    any::Any,
     num::ParseIntError,
     process::exit,
     time::{Duration, SystemTimeError},
@@ -18,6 +19,14 @@ pub enum TTError {
     TTError { message: String },
 }
 
+impl From<serde_json::Error> for TTError {
+    fn from(err: serde_json::Error) -> Self {
+        TTError::TTError {
+            message: format!("{:?}", err),
+        }
+    }
+}
+
 impl From<ParseIntError> for TTError {
     fn from(err: ParseIntError) -> Self {
         TTError::ParseIntError(err)
@@ -33,6 +42,14 @@ impl From<rusqlite::Error> for TTError {
 impl From<SystemTimeError> for TTError {
     fn from(err: SystemTimeError) -> Self {
         TTError::SystemTimeError(err.duration())
+    }
+}
+
+impl From<std::io::Error> for TTError {
+    fn from(err: std::io::Error) -> Self {
+        TTError::TTError {
+            message: format!("{:?}", err),
+        }
     }
 }
 
