@@ -1,9 +1,9 @@
+use clap::Parser;
 use std::{
     num::ParseIntError,
+    process::exit,
     time::{Duration, SystemTimeError},
 };
-
-use clap::Parser;
 pub mod cli;
 pub mod commands;
 pub mod db;
@@ -43,7 +43,21 @@ fn main() {
 
     db::initialize_db(&mut conn).expect("failed to initialize DB");
 
-    commands::execute(&cli, &mut conn).unwrap();
+    let mut exit_code = 0;
+
+    match commands::execute(&cli, &mut conn) {
+        Err(TTError::TTError { message }) => {
+            println!("{}", message);
+            exit_code = 1;
+        }
+        Err(e) => {
+            println!("Error!: {:?}", e);
+            exit_code = 2;
+        }
+        _ => {}
+    };
 
     conn.close().expect("Unable to close DB cleanly");
+
+    exit(exit_code);
 }

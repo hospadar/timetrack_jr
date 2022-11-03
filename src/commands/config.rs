@@ -1,6 +1,7 @@
 use crate::{cli::OptionName, db, TTError};
 use clap::ValueEnum;
-use rusqlite::Connection;
+use libsqlite3_sys;
+use rusqlite::{Connection, ErrorCode};
 
 pub fn show(conn: &mut Connection) -> Result<(), TTError> {
     let tx = conn.transaction()?;
@@ -26,7 +27,21 @@ pub fn delete_category(
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
     let tx = conn.transaction()?;
-    db::delete_category(&tx, category_name, delete_logged_times)?;
+    match db::delete_category(&tx, category_name, delete_logged_times) {
+        Err(TTError::SqlError(rusqlite::Error::SqliteFailure(
+            libsqlite3_sys::Error {
+                code: libsqlite3_sys::ErrorCode::ConstraintViolation,
+                extended_code: _,
+            },
+            _,
+        ))) => {
+            return Err(TTError::TTError { message: "Unable to delete category because times have been logged with that category.  Add --delete-logged-times to delete the category AND any times logged with the category".to_string()});
+        }
+        Err(e) => {
+            return Err(e);
+        }
+        Ok(_) => {}
+    }
     tx.commit()?;
     Ok(())
 }
