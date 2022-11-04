@@ -1,13 +1,12 @@
-use std::{io, num};
-
-use chrono::{DateTime, Datelike};
-use rusqlite::Connection;
-
 use crate::{
     cli,
     db::{self, TimeWindow},
     TTError,
 };
+use chrono::{DateTime, Datelike};
+
+use rusqlite::Connection;
+use std::{io, time::Duration};
 
 fn roll_months<T: chrono::TimeZone>(date: &DateTime<T>, num_months: i32) -> DateTime<T> {
     let mut new_date = date.clone();
@@ -15,7 +14,7 @@ fn roll_months<T: chrono::TimeZone>(date: &DateTime<T>, num_months: i32) -> Date
         return new_date;
     }
 
-    for i in 0..num_months {
+    for _ in 0..num_months {
         if num_months < 0 {
             //decrement
             if new_date.month0() == 0 {
@@ -80,7 +79,43 @@ fn export_json(
     times: Vec<TimeWindow>,
 ) -> Result<(), TTError> {
     outfile.write_all(serde_json::to_string_pretty(&times)?.as_bytes())?;
-    outfile.flush();
+    Ok(())
+}
+
+fn gen_export(
+    conn: &mut Connection,
+    format: &cli::ExportFormat,
+    outfile: &String,
+    start_time: &Option<String>,
+    end_time: &Option<String>,
+) -> Result<(), TTError> {
+    let mut handle: Box<dyn std::io::Write> = Box::new(io::stdout());
+    if outfile != "-" {
+        handle = Box::new(std::fs::File::create(outfile)?)
+    }
+    let mut tx = conn.transaction()?;
+    //parse and check options
+    let start = time_string_to_tstamp(start_time);
+    if start_time.is_some() && start.is_none() {
+        return Err(TTError::TTError {
+            message: "Was unable to parse start-time".to_string(),
+        });
+    }
+    let end = time_string_to_tstamp(end_time);
+    if end_time.is_some() && end.is_none() {
+        return Err(TTError::TTError {
+            message: "was unable to parse end-time".to_string(),
+        });
+    }
+    //fetch times from database
+    let times = db::get_times(&mut tx, start, end)?;
+    match format {
+        cli::ExportFormat::Json => export_json(&mut handle, times)?,
+        cli::ExportFormat::Csv => todo!(),
+        cli::ExportFormat::Ical => todo!(),
+        cli::ExportFormat::Summary => todo!(),
+    }
+    handle.flush()?;
     Ok(())
 }
 
@@ -92,40 +127,20 @@ pub fn export(
     start_time: &Option<String>,
     end_time: &Option<String>,
 ) -> Result<(), TTError> {
-    let mut gen_export = || -> Result<(), TTError> {
-        let mut handle: Box<dyn std::io::Write> = Box::new(io::stdout());
-        if outfile != "-" {
-            handle = Box::new(std::fs::File::create(outfile)?)
-        }
-        let mut tx = conn.transaction()?;
-        //parse and check options
-        let start = time_string_to_tstamp(start_time);
-        if start_time.is_some() && start.is_none() {
-            return Err(TTError::TTError {
-                message: "Was unable to parse start-time".to_string(),
-            });
-        }
-        let end = time_string_to_tstamp(end_time);
-        if end_time.is_some() && end.is_none() {
-            return Err(TTError::TTError {
-                message: "was unable to parse end-time".to_string(),
-            });
-        }
-        //fetch times from database
-        let times = db::get_times(&mut tx, start, end)?;
-        match format {
-            cli::ExportFormat::Json => export_json(&mut handle, times)?,
-            cli::ExportFormat::Csv => todo!(),
-            cli::ExportFormat::Ical => todo!(),
-            cli::ExportFormat::Summary => todo!(),
-        }
-        handle.flush();
-        Ok(())
-    };
-
     if *listen {
-        todo!("implement sqlite listener")
+        let mut last_rowid = conn.last_insert_rowid();
+        loop {
+            let next_rowid: i64 = conn.last_insert_rowid();
+            if last_rowid != next_rowid {
+                match gen_export(conn, format, outfile, start_time, end_time) {
+                    Err(e) => println!("Could not generate export! Error: {:?}", e),
+                    _ => {}
+                }
+                last_rowid = next_rowid
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
     } else {
-        return gen_export();
+        return gen_export(conn, format, outfile, start_time, end_time);
     }
 }

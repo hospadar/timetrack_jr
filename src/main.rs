@@ -1,6 +1,5 @@
 use clap::Parser;
 use std::{
-    any::Any,
     num::ParseIntError,
     process::exit,
     time::{Duration, SystemTimeError},

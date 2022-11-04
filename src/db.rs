@@ -1,17 +1,13 @@
 use crate::{cli, TTError};
-use chrono::{DateTime, FixedOffset, NaiveDateTime, TimeZone, Timelike};
+use chrono::{DateTime, NaiveDateTime, Timelike};
 use clap::ValueEnum;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rusqlite::{
-    types::FromSql, Connection, Map, MappedRows, Row, Rows, Statement, ToSql, Transaction,
-};
+use rusqlite::{Connection, Row, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
-    ops::{Deref, DerefMut},
-    result,
-    time::{Instant, SystemTime, UNIX_EPOCH},
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -250,11 +246,11 @@ pub fn parse_time(time_string: &String) -> Result<HourMinute, TTError> {
             .parse::<u32>()
             .unwrap();
 
-        if (hour > 23) {
+        if hour > 23 {
             return Err(TTError::TTError {
                 message: format!("Got hour={}, but hour must be 0-23", hour),
             });
-        } else if (minute > 59) {
+        } else if minute > 59 {
             return Err(TTError::TTError {
                 message: format!("Got minute={}, but minute must be 0-59", minute),
             });
@@ -378,9 +374,9 @@ pub fn get_times(
 
 #[cfg(test)]
 mod tests {
-    use std::{thread::Thread, time::Duration};
+    use std::time::Duration;
 
-    use chrono::{NaiveDate, Offset};
+    use chrono::NaiveDate;
     use rusqlite::Connection;
 
     use super::*;

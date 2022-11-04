@@ -1,7 +1,6 @@
 use crate::{cli::OptionName, db, TTError};
-use clap::ValueEnum;
 use libsqlite3_sys;
-use rusqlite::{Connection, ErrorCode};
+use rusqlite::Connection;
 
 pub fn show(conn: &mut Connection) -> Result<(), TTError> {
     let tx = conn.transaction()?;
