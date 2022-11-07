@@ -4,9 +4,11 @@ use crate::{
     TTError,
 };
 use chrono::{DateTime, Datelike};
-
 use rusqlite::Connection;
-use std::{io, time::Duration};
+use std::{
+    io,
+    time::{Duration, SystemTime},
+};
 
 fn roll_months<T: chrono::TimeZone>(date: &DateTime<T>, num_months: i32) -> DateTime<T> {
     let mut new_date = date.clone();
@@ -123,20 +125,21 @@ pub fn export(
     conn: &mut Connection,
     format: &cli::ExportFormat,
     listen: &bool,
+    db_path: &String,
     outfile: &String,
     start_time: &Option<String>,
     end_time: &Option<String>,
 ) -> Result<(), TTError> {
     if *listen {
-        let mut last_rowid = conn.last_insert_rowid();
+        let mut last_mod: Option<SystemTime> = None;
         loop {
-            let next_rowid: i64 = conn.last_insert_rowid();
-            if last_rowid != next_rowid {
+            let current_mod = std::fs::metadata(db_path)?.modified()?;
+            if last_mod.is_none() || last_mod.unwrap() != current_mod {
                 match gen_export(conn, format, outfile, start_time, end_time) {
                     Err(e) => println!("Could not generate export! Error: {:?}", e),
                     _ => {}
                 }
-                last_rowid = next_rowid
+                last_mod = Some(current_mod);
             }
             std::thread::sleep(Duration::from_secs(1));
         }

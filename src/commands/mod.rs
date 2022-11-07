@@ -41,6 +41,14 @@ pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
             outfile,
             start_time,
             end_time,
-        } => export::export(conn, format, listen, outfile, start_time, end_time),
+        } => export::export(
+            conn,
+            format,
+            listen,
+            &(cli.db_path.clone()).unwrap(),
+            outfile,
+            start_time,
+            end_time,
+        ),
     }
 }
