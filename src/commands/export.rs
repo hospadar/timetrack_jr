@@ -7,6 +7,7 @@ use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
 use icalendar::{Calendar, Component, Event};
 use rusqlite::Connection;
 use std::{
+    collections::BTreeMap,
     io,
     time::{Duration, SystemTime},
 };
@@ -148,6 +149,68 @@ fn export_csv(
     Ok(())
 }
 
+#[derive(Debug)]
+struct Summary {
+    total: u64,
+    count: u64,
+}
+
+fn export_summary(
+    outfile: &mut Box<dyn std::io::Write>,
+    times: Vec<TimeWindow>,
+) -> Result<(), TTError> {
+    let mut category_totals = BTreeMap::<String, Summary>::new();
+    for time in times {
+        let summary = match category_totals.get_mut(&time.category) {
+            Some(s) => s,
+            None => {
+                category_totals.insert(time.category.clone(), Summary { total: 0, count: 0 });
+                category_totals.get_mut(&time.category).unwrap()
+            }
+        };
+        summary.count += 1;
+        if let Some(end) = time.end_time {
+            summary.total += (unix_to_utc(&end) - unix_to_utc(&time.start_time))
+                .num_seconds()
+                .abs() as u64;
+        }
+    }
+    if let Some((total_duration, total_count)) = category_totals
+        .values()
+        .map(|foo| (foo.total, foo.count))
+        .reduce(|accum, item| (accum.0 + item.0, accum.1 + item.1))
+    {
+        outfile.write_all(
+            format!(
+                "Logged {} activites for a total of {:02}:{:02}\n",
+                total_count,
+                total_duration / 60 / 60,
+                total_duration / 60 % 60
+            )
+            .as_bytes(),
+        )?;
+
+        for (category, summary) in category_totals {
+            outfile.write_all(format!("{}:\n", category).as_bytes())?;
+            outfile.write_all(
+                format!(
+                    "  {} logs, {:02}:{:02} cumulative, {:.2}% of total\n",
+                    summary.count,
+                    summary.total / 60 / 60,
+                    summary.total / 60 % 60,
+                    (summary.total as f64 / total_duration as f64) * 100 as f64
+                )
+                .as_bytes(),
+            )?;
+        }
+    } else {
+        return Err(TTError::TTError {
+            message: "Didn't find any times to summarize".to_string(),
+        });
+    }
+    Ok(())
+}
+
 fn gen_export(
     conn: &mut Connection,
     format: &cli::ExportFormat,
@@ -179,7 +242,7 @@ fn gen_export(
         cli::ExportFormat::Json => export_json(&mut handle, times)?,
         cli::ExportFormat::Csv => export_csv(&mut handle, times)?,
         cli::ExportFormat::Ical => export_ical(&mut handle, times)?,
-        cli::ExportFormat::Summary => todo!(),
+        cli::ExportFormat::Summary => export_summary(&mut handle, times)?,
     }
     handle.flush()?;
     Ok(())
