@@ -3,7 +3,8 @@ use crate::{
     db::{self, TimeWindow},
     TTError,
 };
-use chrono::{DateTime, Datelike};
+use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
+use icalendar::{Calendar, Component, Event};
 use rusqlite::Connection;
 use std::{
     io,
@@ -84,6 +85,69 @@ fn export_json(
     Ok(())
 }
 
+fn unix_to_utc(tstamp: &i64) -> DateTime<Utc> {
+    DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(*tstamp, 0), Utc)
+}
+
+fn export_ical(
+    outfile: &mut Box<dyn std::io::Write>,
+    times: Vec<TimeWindow>,
+) -> Result<(), TTError> {
+    let mut calendar = Calendar::new();
+    for time in times {
+        if time.end_time.is_some() {
+            calendar.push(
+                Event::new()
+                    .summary(&time.category)
+                    .starts(unix_to_utc(&time.start_time))
+                    .ends(unix_to_utc(&time.end_time.unwrap()))
+                    .done(),
+            );
+        }
+    }
+    outfile.write_all(calendar.to_string().as_bytes())?;
+    Ok(())
+}
+fn export_csv(
+    outfile: &mut Box<dyn std::io::Write>,
+    times: Vec<TimeWindow>,
+) -> Result<(), TTError> {
+    outfile.write_all(
+        &"category,start,end,start_tstamp,end_tstamp,duration_hours,duration_seconds\n".as_bytes(),
+    )?;
+    for time in times {
+        outfile.write_all(
+            &format!(
+                "{},{},{},{},{},{},{}\n",
+                time.category
+                    .replace(",", ".")
+                    .replace("\n", "")
+                    .replace("\r", ""),
+                DateTime::<chrono::Local>::from(unix_to_utc(&time.start_time)).to_rfc3339(),
+                match time.end_time {
+                    Some(end) => DateTime::<chrono::Local>::from(unix_to_utc(&end)).to_rfc3339(),
+                    None => "".to_string(),
+                },
+                time.start_time,
+                match time.end_time {
+                    Some(end) => end.to_string(),
+                    None => "".to_string(),
+                },
+                match time.end_time {
+                    Some(end) => (((end - time.start_time) as f64) / 60.0 / 60.0).to_string(),
+                    None => "".to_string(),
+                },
+                match time.end_time {
+                    Some(end) => ((end - time.start_time) as f64).to_string(),
+                    None => "".to_string(),
+                },
+            )
+            .as_bytes(),
+        )?;
+    }
+    Ok(())
+}
+
 fn gen_export(
     conn: &mut Connection,
     format: &cli::ExportFormat,
@@ -113,8 +177,8 @@ fn gen_export(
     let times = db::get_times(&mut tx, start, end)?;
     match format {
         cli::ExportFormat::Json => export_json(&mut handle, times)?,
-        cli::ExportFormat::Csv => todo!(),
-        cli::ExportFormat::Ical => todo!(),
+        cli::ExportFormat::Csv => export_csv(&mut handle, times)?,
+        cli::ExportFormat::Ical => export_ical(&mut handle, times)?,
         cli::ExportFormat::Summary => todo!(),
     }
     handle.flush()?;
