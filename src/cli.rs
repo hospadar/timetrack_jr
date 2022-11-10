@@ -14,14 +14,35 @@ pub struct Cli {
 #[derive(Subcommand, Debug)]
 pub enum Commands {
     ///Set up DB and configure options
-    Config {
-        #[command(subcommand)]
-        config_command: ConfigCommands,
+    ///Show config options and currently-registered-categories
+    ShowConfig,
+    ///Create a new category that you can use for time tracking
+    AddCategory { category_name: String },
+    ///Delete a category
+    DeleteCategory {
+        category_name: String,
+        #[arg(short, long)]
+        delete_logged_times: bool,
     },
-    ///Start or stop timing an activity, or amend an existing time
-    Log {
-        #[command(subcommand)]
-        log_command: LogCommands,
+    ///Set a global option
+    SetOption {
+        option_name: OptionName,
+        option_value: String,
+    },
+    ///Remove an option
+    UnsetOption { option_name: OptionName },
+    ///Start timing an activity - stops timing any currently running activities
+    StartTiming { category_name: String },
+    ///End timing
+    StopTiming,
+    AmendTime {
+        time_id: i64,
+        #[arg(short, long)]
+        start_time: Option<String>,
+        #[arg(short, long)]
+        end_time: Option<String>,
+        #[arg(short, long)]
+        category: Option<String>,
     },
     ///Export the DB to a more friendly format for analysis
     Export {
@@ -40,48 +61,6 @@ pub enum Commands {
         ///Latest entries to include in the extract (defaults to everything)
         #[arg(short, long)]
         end_time: Option<String>,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-pub enum ConfigCommands {
-    ///Show config options and currently-registered-categories
-    Show,
-    ///Create a new category that you can use for time tracking
-    AddCategory {
-        category_name: String,
-    },
-    ///Delete a category
-    DeleteCategory {
-        category_name: String,
-        #[arg(short, long)]
-        delete_logged_times: bool,
-    },
-    ///Set a global option
-    SetOption {
-        option_name: OptionName,
-        option_value: String,
-    },
-
-    UnsetOption {
-        option_name: OptionName,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-pub enum LogCommands {
-    StartTiming {
-        category_name: String,
-    },
-    StopTiming,
-    AmendTime {
-        time_id: i64,
-        #[arg(short, long)]
-        start_time: Option<String>,
-        #[arg(short, long)]
-        end_time: Option<String>,
-        #[arg(short, long)]
-        category: Option<String>,
     },
 }
 

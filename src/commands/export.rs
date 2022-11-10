@@ -158,7 +158,34 @@ struct Summary {
 fn export_summary(
     outfile: &mut Box<dyn std::io::Write>,
     times: Vec<TimeWindow>,
+    start: Option<i64>,
+    end: Option<i64>,
 ) -> Result<(), TTError> {
+    match (start, end) {
+        (None, None) => outfile.write_all("Tabulating results for all time\n".as_bytes())?,
+        (Some(s), None) => outfile.write_all(
+            format!(
+                "Tabulating results starting on/after {}\n",
+                DateTime::<chrono::Local>::from(unix_to_utc(&s)).to_rfc2822()
+            )
+            .as_bytes(),
+        )?,
+        (None, Some(e)) => outfile.write_all(
+            format!(
+                "Tabulating results through {}\n",
+                DateTime::<chrono::Local>::from(unix_to_utc(&e)).to_rfc2822()
+            )
+            .as_bytes(),
+        )?,
+        (Some(s), Some(e)) => outfile.write_all(
+            format!(
+                "Tabulating results starting on/after {} through {}\n",
+                DateTime::<chrono::Local>::from(unix_to_utc(&s)).to_rfc2822(),
+                DateTime::<chrono::Local>::from(unix_to_utc(&e)).to_rfc2822()
+            )
+            .as_bytes(),
+        )?,
+    }
     let mut category_totals = BTreeMap::<String, Summary>::new();
     for time in times {
         let summary = match category_totals.get_mut(&time.category) {
@@ -242,7 +269,7 @@ fn gen_export(
         cli::ExportFormat::Json => export_json(&mut handle, times)?,
         cli::ExportFormat::Csv => export_csv(&mut handle, times)?,
         cli::ExportFormat::Ical => export_ical(&mut handle, times)?,
-        cli::ExportFormat::Summary => export_summary(&mut handle, times)?,
+        cli::ExportFormat::Summary => export_summary(&mut handle, times, start, end)?,
     }
     handle.flush()?;
     Ok(())
