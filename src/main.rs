@@ -52,6 +52,14 @@ impl From<std::io::Error> for TTError {
     }
 }
 
+impl From<notify_rust::error::Error> for TTError {
+    fn from(err: notify_rust::error::Error) -> Self {
+        TTError::TTError {
+            message: format!("{:?}", err),
+        }
+    }
+}
+
 fn main() {
     let cli = cli::Cli::parse();
     let mut conn =

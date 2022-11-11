@@ -21,14 +21,15 @@ pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
             option_value,
         } => config::set_option(conn, option_name, option_value),
         Commands::UnsetOption { option_name } => unset_option(conn, option_name),
-        Commands::StartTiming { category_name } => log::start_timing(conn, category_name),
-        Commands::StopTiming => log::stop_timing(conn),
+        Commands::StartTiming { category_name, notify } => log::start_timing(conn, category_name, notify),
+        Commands::StopTiming {notify} => log::stop_timing(conn, notify),
         Commands::AmendTime {
             time_id,
             start_time,
             end_time,
             category,
         } => log::amend_time(conn, time_id, start_time, end_time, category),
+        Commands::DeleteTime { time_id } => log::delete_time(conn, time_id),
         Commands::Export {
             format,
             listen,

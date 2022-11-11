@@ -1,3 +1,4 @@
+use chrono::{DateTime, Datelike};
 use clap::{Parser, Subcommand};
 
 #[derive(Parser, Debug)]
@@ -9,6 +10,72 @@ pub struct Cli {
 
     #[command(subcommand)]
     pub command: Commands,
+}
+
+fn roll_months<T: chrono::TimeZone>(date: &DateTime<T>, num_months: i32) -> DateTime<T> {
+    let mut new_date = date.clone();
+    if num_months == 0 {
+        return new_date;
+    }
+
+    for _ in 0..num_months {
+        if num_months < 0 {
+            //decrement
+            if new_date.month0() == 0 {
+                //decrement the year
+                new_date = new_date
+                    .with_month0(11)
+                    .unwrap()
+                    .with_year(new_date.year() - 1)
+                    .unwrap()
+            }
+            new_date = new_date.with_month0(new_date.month0() - 1).unwrap();
+        } else {
+            //increment
+            if new_date.month0() == 11 {
+                //increment the year
+                new_date = new_date
+                    .with_month0(0)
+                    .unwrap()
+                    .with_year(new_date.year() + 1)
+                    .unwrap()
+            }
+            new_date = new_date.with_month0(new_date.month0() + 1).unwrap();
+        }
+    }
+
+    return new_date;
+}
+
+pub fn time_string_to_tstamp(tstring: &Option<String>) -> Option<i64> {
+    match tstring {
+        Some(raw_time) => {
+            if let Ok(parsed) = chrono_english::parse_date_string(
+                raw_time,
+                chrono::Local::now(),
+                chrono_english::Dialect::Us,
+            ) {
+                Some(parsed.timestamp())
+            } else if let Ok(parsed_duration) = chrono_english::parse_duration(raw_time) {
+                let mut parsed_time = chrono::Local::now();
+                match parsed_duration {
+                    chrono_english::Interval::Seconds(n) => {
+                        parsed_time += chrono::Duration::seconds(n as i64)
+                    }
+                    chrono_english::Interval::Days(n) => {
+                        parsed_time += chrono::Duration::days(n as i64)
+                    }
+                    chrono_english::Interval::Months(n) => {
+                        parsed_time = roll_months(&parsed_time, n)
+                    }
+                }
+                return Some(parsed_time.timestamp());
+            } else {
+                None
+            }
+        }
+        _ => None,
+    }
 }
 
 #[derive(Subcommand, Debug)]
@@ -32,9 +99,16 @@ pub enum Commands {
     ///Remove an option
     UnsetOption { option_name: OptionName },
     ///Start timing an activity - stops timing any currently running activities
-    StartTiming { category_name: String },
+    StartTiming { 
+        category_name: String,
+        #[arg(short, long)]
+        notify: bool
+    },
     ///End timing
-    StopTiming,
+    StopTiming {
+        #[arg(short, long)]
+        notify: bool
+    },
     AmendTime {
         time_id: i64,
         #[arg(short, long)]
@@ -43,6 +117,9 @@ pub enum Commands {
         end_time: Option<String>,
         #[arg(short, long)]
         category: Option<String>,
+    },
+    DeleteTime {
+        time_id:i64
     },
     ///Export the DB to a more friendly format for analysis
     Export {

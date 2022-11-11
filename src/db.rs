@@ -178,7 +178,7 @@ pub fn delete_category(
     delete_logged_times: &bool,
 ) -> Result<(), TTError> {
     if *delete_logged_times {
-        tx.execute("DELETE FROM times WHERE category", (&category_name,))?;
+        tx.execute("DELETE FROM times WHERE category=?", (&category_name,))?;
     }
     tx.execute("DELETE FROM categories WHERE name=?", (&category_name,))?;
 
@@ -227,6 +227,21 @@ pub fn get_time(tx: &Transaction, id: i64) -> Result<TimeWindow, TTError> {
             end_time: row.get("end_time").unwrap(),
         })
     })
+}
+
+pub fn get_last_open_time(tx: &Transaction) -> Result<Option<TimeWindow>, TTError> {
+    let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1")?;
+    let mut rows = stmt.query(())?;
+    if let Some(row) = rows.next()?{
+        Ok(Some(TimeWindow {
+            id: Some(row.get("id").unwrap()),
+            category: row.get("category").unwrap(),
+            start_time: row.get("start_time").unwrap(),
+            end_time: row.get("end_time").unwrap(),
+        }))
+    } else {
+        Ok(None)
+    }
 }
 
 ///given an HH:MM string, parses and validates to make sure it looks like a valid
@@ -331,6 +346,10 @@ pub fn start_timing(tx: &mut Transaction, category: &String) -> Result<(), TTErr
             end_time: None,
         },
     )
+}
+
+pub fn delete_time(tx: &mut Transaction, id: &i64) -> Result<usize, TTError> {
+    Ok(tx.execute("DELETE FROM times WHERE id=?", (id,))?)
 }
 
 pub fn get_times(
