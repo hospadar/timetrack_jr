@@ -2,6 +2,11 @@
 name = "timetrack_jr"
 version = "1.0.0"
 edition = "2021"
+license-file = "LICENSE.txt"
+description = "Simple CLI time-tracking utility"
+homepage = "https://github.com/hospadar/timetrack_jr/"
+repository = "https://github.com/hospadar/timetrack_jr/"
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
