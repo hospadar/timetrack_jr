@@ -2,10 +2,65 @@
 
 Small CLI utility to facilitate tracking the time it takes to do different activities (at work, for consultants, or whatever!).
 
-Timetrack Jr. logs the start and end times of different activities to a local sqlite database and can export summaries of those time logs as csv, json, a text summary, or an .ical file (that you could pull into your favorite calendar tool)
+Timetrack Jr. logs the start and end times of different activities to a local sqlite database and can export summaries of those time logs as csv, json, a text summary, or an .ical file (that you could pull into your favorite calendar tool).
 
-## Quick Start
-First, set up your ttjr database with some categories to record times to.  Optionally, you can set an end-of-day time to automaticall end times (I forget to press "stop" at the end of the work day)
+<!-- vscode-markdown-toc -->
+* 1. [Cool Features](#CoolFeatures)
+* 2. [Quick Start](#QuickStart)
+	* 2.1. [Using CLI & help](#UsingCLIhelp)
+	* 2.2. [Setting Up Your Timetrack Jr. Database](#SettingUpYourTimetrackJr.Database)
+	* 2.3. [Record Some Times!](#RecordSomeTimes)
+	* 2.4. [Generate Handy Exports of Logged Times](#GenerateHandyExportsofLoggedTimes)
+	* 2.5. [Editing and Amending Logged Times](#EditingandAmendingLoggedTimes)
+* 3. [Building](#Building)
+
+<!-- vscode-markdown-toc-config
+	numbering=true
+	autoSave=true
+	/vscode-markdown-toc-config -->
+<!-- /vscode-markdown-toc -->
+
+
+##  1. <a name='CoolFeatures'></a>Cool Features
+1. Record start end end times for different categories of activity
+2. Produce possibly-useful exports of logged times
+3. Produce a simple summary of logged activity
+4. Auto-complete times at end-of-business if you're a strict-work-life-balance folk like me
+5. Cute name
+6. Rust?
+
+##  2. <a name='QuickStart'></a>Quick Start
+
+###  2.1. <a name='UsingCLIhelp'></a>Using CLI & help
+```sh
+#####
+# CLI
+#####
+#The cli is structured as a bunch of subcommands.  Use --help to get detailed help for any subcommand (i.e. `ttjr show-config --help`)
+$ ttjr --help
+Usage: ttjr [OPTIONS] <COMMAND>
+
+Commands:
+  show-config      Set up DB and configure options Show config options and currently-registered-categories
+  add-category     Create a new category that you can use for time tracking
+  delete-category  Delete a category
+  set-option       Set a global option
+  unset-option     Remove an option
+  start-timing     Start timing an activity - stops timing any currently running activities
+  stop-timing      End timing
+  amend-time       
+  delete-time      
+  export           Export the DB to a more friendly format for analysis
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+      --db-path <DB_PATH>  [default: ttjr.sqlite3]
+  -h, --help               Print help information
+  -V, --version            Print version information
+```
+
+###  2.2. <a name='SettingUpYourTimetrackJr.Database'></a>Setting Up Your Timetrack Jr. Database
+
 ```sh
 #########
 # DB Setup
@@ -14,6 +69,7 @@ First, set up your ttjr database with some categories to record times to.  Optio
 $ ttjr add-category project-for-client-a
 $ ttjr add-category project-for-client-b
 #if you want, you can set an end-of-day time which will automatically end any started time categories at 17:00
+#turns out this is the only available option right now :)
 $ ttjr set-option end-of-day 17:00
 $ ttjr show-config
 {
@@ -31,7 +87,11 @@ $ ls
 ttjr.sqlite3
 #If you want it somewhere else, use --db-path like
 $ ttjr --db-path ~/.ttjr.sqlite3 <COMMAND>
+```
 
+###  2.3. <a name='RecordSomeTimes'></a>Record Some Times!
+
+```sh
 ######
 # Start timing stuff!
 ######
@@ -44,9 +104,11 @@ $ ttjr start-timing project-for-client-b
 $ ttjr stop-timing 
 #back to work little capitalist
 $ ttjr start-timing project-for-client-a
+```
 
+###  2.4. <a name='GenerateHandyExportsofLoggedTimes'></a>Generate Handy Exports of Logged Times
 
-
+```sh
 ######
 # Export timing data to do something interesting with it!
 ######
@@ -83,9 +145,13 @@ $ ttjr export --format json
 ]
 
 #Have ttjr generate and keep up-to-date an ical file that you can pull into gcal/outlook/etc
+#HOT TIP: export to an ical file in dropbox/gdrive/etc and publish it so you can point a web calendar at it!
 $ ttjr export --format ical --outfile ~/my_times.ical --listen
+```
 
+###  2.5. <a name='EditingandAmendingLoggedTimes'></a>Editing and Amending Logged Times
 
+```sh
 ######
 # Editing/amending times
 ######
@@ -93,5 +159,10 @@ $ ttjr export --format ical --outfile ~/my_times.ical --listen
 $ ttjr amend-time 2 -s "2022-11-01 10:00" -e "2022-11-01 12:00"
 #delete an entry
 $ ttjr delete-time 3
+```
 
+##  3. <a name='Building'></a>Building
+```sh
+$ cargo build --release
+$ cp target/release/ttjr <wherever you keep your bins>
 ```
