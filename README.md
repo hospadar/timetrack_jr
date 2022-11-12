@@ -5,8 +5,8 @@ Small CLI utility to facilitate tracking the time it takes to do different activ
 Timetrack Jr. logs the start and end times of different activities to a local sqlite database and can export summaries of those time logs as csv, json, a text summary, or an .ical file (that you could pull into your favorite calendar tool).
 
 <!-- vscode-markdown-toc -->
-* 1. [Usage](#Usage)
-* 2. [Quick Start](#QuickStart)
+* 1. [Features](#Features)
+* 2. [Usage](#Usage)
 	* 2.1. [Using CLI & help](#UsingCLIhelp)
 	* 2.2. [Setting Up Your Timetrack Jr. Database](#SettingUpYourTimetrackJr.Database)
 	* 2.3. [Record Some Times!](#RecordSomeTimes)
@@ -20,8 +20,7 @@ Timetrack Jr. logs the start and end times of different activities to a local sq
 	/vscode-markdown-toc-config -->
 <!-- /vscode-markdown-toc -->
 
-
-##  1. <a name='Usage'></a>Usage
+##  1. <a name='Features'></a>Features
 1. Record start end end times for different categories of activity
 2. Produce possibly-useful exports of logged times
 3. Produce a simple summary of logged activity
@@ -29,7 +28,8 @@ Timetrack Jr. logs the start and end times of different activities to a local sq
 5. Cute name
 6. Rust?
 
-##  2. <a name='QuickStart'></a>Quick Start
+##  2. <a name='Usage'></a>Usage
+
 
 ###  2.1. <a name='UsingCLIhelp'></a>Using CLI & help
 ```sh
