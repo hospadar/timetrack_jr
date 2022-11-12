@@ -13,6 +13,7 @@ Timetrack Jr. logs the start and end times of different activities to a local sq
 	* 2.4. [Generate Handy Exports of Logged Times](#GenerateHandyExportsofLoggedTimes)
 	* 2.5. [Editing and Amending Logged Times](#EditingandAmendingLoggedTimes)
 * 3. [Building](#Building)
+* 4. [Installing](#Installing)
 
 <!-- vscode-markdown-toc-config
 	numbering=true
@@ -164,5 +165,12 @@ $ ttjr delete-time 3
 ##  3. <a name='Building'></a>Building
 ```sh
 $ cargo build --release
-$ cp target/release/ttjr <wherever you keep your bins>
 ```
+
+##  4. <a name='Installing'></a>Installing
+1. Download a binary from the "Releases" page (linux/windows x86_64), OR:
+2. Use `cargo` to install:
+    ```sh
+    $ cargo install -f timetrack_jr
+    $ ttjr --help
+    ```
