@@ -3,9 +3,13 @@ Copyright 2022 Luke Hospadaruk
 This file is part of Timetrack Jr.
 Timetrack Jr. is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
-use crate::{db::{self, TimeWindow}, TTError, cli};
+use crate::{
+    cli,
+    db::{self, TimeWindow},
+    TTError,
+};
 use notify_rust::{Notification, Timeout};
 use rusqlite::{Connection, Transaction};
 
@@ -24,13 +28,17 @@ fn stop_timing_private(tx: &mut Transaction, notify: &bool) -> Result<(), TTErro
     Ok(())
 }
 
-pub fn start_timing(conn: &mut Connection, category_name: &String, notify: &bool) -> Result<(), TTError> {
+pub fn start_timing(
+    conn: &mut Connection,
+    category_name: &String,
+    notify: &bool,
+) -> Result<(), TTError> {
     let mut tx = conn.transaction()?;
     let categories = db::get_categories(&mut tx)?;
     if !categories.contains(category_name) {
         return Err(TTError::TTError { message: format!("Category '{}' does not exist in the timetrack jr database, use `ttjr add-category` to add it", category_name) });
     }
-    let mut last_open:Option<TimeWindow> = None;
+    let mut last_open: Option<TimeWindow> = None;
     if *notify {
         last_open = db::get_last_open_time(&mut tx)?;
     }
@@ -40,9 +48,15 @@ pub fn start_timing(conn: &mut Connection, category_name: &String, notify: &bool
 
     if *notify {
         if let Some(time) = &last_open {
-            Notification::new().summary(&format!("Stopped: {}", time.category)).appname("Timetrack Jr.").show()?;
+            Notification::new()
+                .summary(&format!("Stopped: {}", time.category))
+                .appname("Timetrack Jr.")
+                .show()?;
         }
-        Notification::new().summary(&format!("Started: {}", category_name)).appname("Timetrack Jr.").show()?;
+        Notification::new()
+            .summary(&format!("Started: {}", category_name))
+            .appname("Timetrack Jr.")
+            .show()?;
     }
 
     return Ok(());
@@ -50,7 +64,7 @@ pub fn start_timing(conn: &mut Connection, category_name: &String, notify: &bool
 
 pub fn stop_timing(conn: &mut Connection, notify: &bool) -> Result<(), TTError> {
     let mut tx = conn.transaction()?;
-    let mut last_open:Option<TimeWindow> = None;
+    let mut last_open: Option<TimeWindow> = None;
     if *notify {
         last_open = db::get_last_open_time(&mut tx)?;
     }
@@ -58,7 +72,10 @@ pub fn stop_timing(conn: &mut Connection, notify: &bool) -> Result<(), TTError> 
     tx.commit()?;
     if *notify {
         if let Some(time) = &last_open {
-            Notification::new().summary(&format!("Stopped: {}", time.category)).appname("Timetrack Jr.").show()?;
+            Notification::new()
+                .summary(&format!("Stopped: {}", time.category))
+                .appname("Timetrack Jr.")
+                .show()?;
         }
     }
     return Ok(());
@@ -88,17 +105,15 @@ pub fn amend_time(
     Ok(())
 }
 
-pub fn delete_time(
-    conn: &mut Connection,
-    time_id: &i64,
-)-> Result<(), TTError> {
+pub fn delete_time(conn: &mut Connection, time_id: &i64) -> Result<(), TTError> {
     let mut tx = conn.transaction()?;
     let did_delete = db::delete_time(&mut tx, &time_id)?;
     tx.commit()?;
     if did_delete == 0 {
-        Err(TTError::TTError { message: "Invalid time ID".to_string() })
+        Err(TTError::TTError {
+            message: "Invalid time ID".to_string(),
+        })
     } else {
         Ok(())
     }
-
 }

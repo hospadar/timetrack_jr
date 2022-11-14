@@ -3,25 +3,22 @@ Copyright 2022 Luke Hospadaruk
 This file is part of Timetrack Jr.
 Timetrack Jr. is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
 use crate::{
     cli,
     db::{self, TimeWindow},
     TTError,
 };
-use chrono::{DateTime, Datelike, NaiveDateTime, Utc};
+use chrono::{DateTime, Datelike, Local, NaiveDateTime, Utc};
 use icalendar::{Calendar, Component, Event};
+use notify_rust::{Notification, Timeout};
 use rusqlite::Connection;
 use std::{
     collections::BTreeMap,
     io,
     time::{Duration, SystemTime},
 };
-
-
-
-
 
 fn export_json(
     outfile: &mut Box<dyn std::io::Write>,
@@ -245,4 +242,33 @@ pub fn export(
     } else {
         return gen_export(conn, format, outfile, start_time, end_time);
     }
+}
+
+pub(crate) fn currently_timing(conn: &mut Connection, notify: &bool) -> Result<(), TTError> {
+    let tx = conn.transaction()?;
+    if let Some(open_time) = db::get_last_open_time(&tx)? {
+        if *notify {
+            let start_tstamp = unix_to_utc(&open_time.start_time);
+            let duration_sec = (chrono::Utc::now() - start_tstamp).num_seconds();
+            Notification::new()
+                .appname("Timetrack Jr.")
+                .summary(&format!("Currently timing \"{}\"", open_time.category))
+                .body(&format!(
+                    "Started: {}\nDuration: {:02}:{:02}:{:02}",
+                    DateTime::<Local>::from(start_tstamp).to_rfc2822(),
+                    duration_sec / 60 / 60,
+                    duration_sec / 60 % 60,
+                    duration_sec % 60,
+                ))
+                .show()?;
+        }
+        println!("{}", serde_json::to_string_pretty(&open_time)?)
+    } else if *notify {
+        Notification::new()
+            .appname("Timetrack Jr.")
+            .summary("Not currently timing")
+            .timeout(Timeout::Milliseconds(5000))
+            .show()?;
+    }
+    Ok(())
 }

@@ -2,7 +2,7 @@
 This file is part of Timetrack Jr.
 Timetrack Jr. is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
 use chrono::{DateTime, Datelike};
 use clap::{Parser, Subcommand};
@@ -90,7 +90,9 @@ pub enum Commands {
     ///Show config options and currently-registered-categories
     ShowConfig,
     ///Create a new category that you can use for time tracking
-    AddCategory { category_name: String },
+    AddCategory {
+        category_name: String,
+    },
     ///Delete a category
     DeleteCategory {
         category_name: String,
@@ -103,17 +105,19 @@ pub enum Commands {
         option_value: String,
     },
     ///Remove an option
-    UnsetOption { option_name: OptionName },
+    UnsetOption {
+        option_name: OptionName,
+    },
     ///Start timing an activity - stops timing any currently running activities
-    StartTiming { 
+    StartTiming {
         category_name: String,
         #[arg(short, long)]
-        notify: bool
+        notify: bool,
     },
     ///End timing
     StopTiming {
         #[arg(short, long)]
-        notify: bool
+        notify: bool,
     },
     AmendTime {
         time_id: i64,
@@ -124,8 +128,12 @@ pub enum Commands {
         #[arg(short, long)]
         category: Option<String>,
     },
+    CurrentlyTiming {
+        #[arg(short, long)]
+        notify: bool,
+    },
     DeleteTime {
-        time_id:i64
+        time_id: i64,
     },
     ///Export the DB to a more friendly format for analysis
     Export {
