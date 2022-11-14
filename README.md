@@ -11,7 +11,8 @@ Timetrack Jr. logs the start and end times of different activities to a local sq
 	* 2.2. [Setting Up Your Timetrack Jr. Database](#SettingUpYourTimetrackJr.Database)
 	* 2.3. [Record Some Times!](#RecordSomeTimes)
 	* 2.4. [Generate Handy Exports of Logged Times](#GenerateHandyExportsofLoggedTimes)
-	* 2.5. [Editing and Amending Logged Times](#EditingandAmendingLoggedTimes)
+	* 2.5. [Show what's being timed right now](#Showwhatsbeingtimedrightnow)
+	* 2.6. [Editing and Amending Logged Times](#EditingandAmendingLoggedTimes)
 * 3. [Building](#Building)
 * 4. [Installing](#Installing)
 
@@ -150,7 +151,20 @@ $ ttjr export --format json
 $ ttjr export --format ical --outfile ~/my_times.ical --listen
 ```
 
-###  2.5. <a name='EditingandAmendingLoggedTimes'></a>Editing and Amending Logged Times
+###  2.5. <a name='Showwhatsbeingtimedrightnow'></a>Show what's being timed right now
+```sh
+#Show the time log that's currently being recorded (i.e. what's been started but hasn't been stopped yet)
+#Optionally send a desktop notification with --notify
+$ ttjr currently-timing --notify
+{
+  "id": 7,
+  "category": "📖 admin",
+  "start_time": 1668452495,
+  "end_time": null
+}
+```
+
+###  2.6. <a name='EditingandAmendingLoggedTimes'></a>Editing and Amending Logged Times
 
 ```sh
 ######
