@@ -14,6 +14,7 @@ readme = "README.md"
 chrono = "0.4.22"
 chrono-english = "0.1.7"
 clap = { version = "4.0.15", features = ["derive"] }
+fallible-iterator = "0.2.0"
 icalendar = "0.13.3"
 libsqlite3-sys = "0.25.2"
 notify-rust = "4.5.10"

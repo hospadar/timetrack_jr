@@ -2,14 +2,15 @@
 This file is part of Timetrack Jr.
 Timetrack Jr. is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
 use crate::{cli, TTError};
 use chrono::{DateTime, NaiveDateTime, Timelike};
 use clap::ValueEnum;
+use fallible_iterator::FallibleIterator;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rusqlite::{Connection, Row, ToSql, Transaction};
+use rusqlite::{named_params, Connection, Row, ToSql, Transaction};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -193,6 +194,36 @@ pub fn delete_category(
 
 ///Update a time in the DB.  does NOT commit the transaction
 pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError> {
+    //disallow overlapping time entries
+    let mut stmt = tx.prepare(
+        "SELECT id c \
+        WHERE 
+            (:id IS NULL or id !=:id) \
+            AND (\
+                (start_time <= :start AND end_time > :start)\
+                OR (:end IS NOT NULL and :end > start_time AND (end_time IS NULL OR :end <= end_time))\
+            )\
+        ")?;
+    let rows = stmt.query(named_params! {
+        ":id": time.id,
+        ":start": time.start_time,
+        ":end": time.end_time
+    })?;
+    let overlapping_ids: Vec<String> = rows
+        .map(|row| -> Result<i64, _> { row.get(0) })
+        .collect::<Vec<i64>>()?
+        .iter()
+        .map(|i| i.to_string())
+        .collect();
+    if overlapping_ids.len() > 0 {
+        return Err(TTError::TTError {
+            message: format!(
+                "Attempted to insert time that overlaps with other times! (overlapped IDs: {})",
+                overlapping_ids.join(", ")
+            ),
+        });
+    }
+
     let mut params: Vec<(&str, &dyn ToSql)> = Vec::new();
 
     if let Some(id) = &time.id {
@@ -236,9 +267,10 @@ pub fn get_time(tx: &Transaction, id: i64) -> Result<TimeWindow, TTError> {
 }
 
 pub fn get_last_open_time(tx: &Transaction) -> Result<Option<TimeWindow>, TTError> {
-    let mut stmt = tx.prepare("SELECT * FROM times WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1")?;
+    let mut stmt =
+        tx.prepare("SELECT * FROM times WHERE end_time IS NULL ORDER BY start_time DESC LIMIT 1")?;
     let mut rows = stmt.query(())?;
-    if let Some(row) = rows.next()?{
+    if let Some(row) = rows.next()? {
         Ok(Some(TimeWindow {
             id: Some(row.get("id").unwrap()),
             category: row.get("category").unwrap(),
