@@ -1,5 +1,3 @@
-- "show what's timing now" with notification option
-- add time id to csv export
 - add human-readable data to JSON export
 - fix floating point precision in csv export
 - "rename category"

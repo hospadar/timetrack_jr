@@ -14,17 +14,46 @@ use chrono::{DateTime, Datelike, Local, NaiveDateTime, Utc};
 use icalendar::{Calendar, Component, Event};
 use notify_rust::{Notification, Timeout};
 use rusqlite::Connection;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::BTreeMap,
     io,
     time::{Duration, SystemTime},
 };
 
+#[derive(Serialize, Deserialize, PartialEq, Eq, Debug)]
+struct TimeWindowExport {
+    pub id: Option<i64>,
+    pub category: String,
+    pub start_time: i64,
+    pub end_time: Option<i64>,
+    pub start_timestamp: String,
+    pub end_timestamp: Option<String>,
+}
+
+impl From<TimeWindow> for TimeWindowExport {
+    fn from(w: TimeWindow) -> Self {
+        TimeWindowExport {
+            id: w.id,
+            category: w.category,
+            start_time: w.start_time.clone(),
+            end_time: w.end_time.clone(),
+            start_timestamp: DateTime::<chrono::Local>::from(unix_to_utc(&w.start_time))
+                .to_rfc3339(),
+            end_timestamp: match w.end_time {
+                Some(t) => Some(DateTime::<chrono::Local>::from(unix_to_utc(&t)).to_rfc3339()),
+                None => None,
+            },
+        }
+    }
+}
+
 fn export_json(
     outfile: &mut Box<dyn std::io::Write>,
     times: Vec<TimeWindow>,
 ) -> Result<(), TTError> {
-    outfile.write_all(serde_json::to_string_pretty(&times)?.as_bytes())?;
+    let times_export: Vec<TimeWindowExport> = times.into_iter().map(|t| t.into()).collect();
+    outfile.write_all(serde_json::to_string_pretty(&times_export)?.as_bytes())?;
     Ok(())
 }
 
@@ -56,12 +85,14 @@ fn export_csv(
     times: Vec<TimeWindow>,
 ) -> Result<(), TTError> {
     outfile.write_all(
-        &"category,start,end,start_tstamp,end_tstamp,duration_hours,duration_seconds\n".as_bytes(),
+        &"id,category,start,end,start_tstamp,end_tstamp,duration_hours,duration_seconds\n"
+            .as_bytes(),
     )?;
     for time in times {
         outfile.write_all(
             &format!(
-                "{},{},{},{},{},{},{}\n",
+                "{},{},{},{},{},{},{},{}\n",
+                time.id.unwrap_or(-1),
                 time.category
                     .replace(",", ".")
                     .replace("\n", "")

@@ -194,11 +194,17 @@ pub fn delete_category(
 
 ///Update a time in the DB.  does NOT commit the transaction
 pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError> {
+    //must not overlap with an existing complete time
+    //if there is an on open time, the time being upserted must be:
+    //  a.the same time
+    //  b. a different time AND not overlapping with the _start_ of the open time
+
     //disallow overlapping time entries
     let mut stmt = tx.prepare(
         "SELECT id c \
+        FROM times
         WHERE 
-            (:id IS NULL or id !=:id) \
+            (id IS DISTINCT FROM :id) \
             AND (\
                 (start_time <= :start AND end_time > :start)\
                 OR (:end IS NOT NULL and :end > start_time AND (end_time IS NULL OR :end <= end_time))\
@@ -218,8 +224,10 @@ pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError
     if overlapping_ids.len() > 0 {
         return Err(TTError::TTError {
             message: format!(
-                "Attempted to insert time that overlaps with other times! (overlapped IDs: {})",
-                overlapping_ids.join(", ")
+                "Attempted to insert time that overlaps with other times! (overlapped IDs: {}) (time to insert: {:?}) (example overlap: {:?})",
+                overlapping_ids.join(", "),
+                time,
+                get_time(tx, str::parse::<i64>(overlapping_ids.get(0).unwrap()).unwrap()).unwrap()
             ),
         });
     }
