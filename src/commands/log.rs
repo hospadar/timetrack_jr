@@ -117,3 +117,41 @@ pub fn delete_time(conn: &mut Connection, time_id: &i64) -> Result<(), TTError> 
         Ok(())
     }
 }
+
+pub fn bulk_delete_times(
+    conn: &mut Connection,
+    start_time: &String,
+    end_time: &String,
+    non_inclusive: &bool,
+) -> Result<(), TTError> {
+    let mut tx = conn.transaction()?;
+
+    let start = cli::time_string_to_tstamp(&Some(start_time.clone()));
+    let end = cli::time_string_to_tstamp(&Some(end_time.clone()));
+
+    let rows_deleted = match (start, end) {
+        (Some(s), Some(e)) => db::bulk_delete_times(&mut tx, &s, &e, non_inclusive)?,
+        (Some(_), None) => {
+            return Err(TTError::TTError {
+                message: format!("Could not parse --end-time, got \"{}\"", end_time),
+            })
+        }
+        (None, Some(_)) => {
+            return Err(TTError::TTError {
+                message: format!("Could not parse --start-time, got \"{}\"", end_time),
+            })
+        }
+        (None, None) => {
+            return Err(TTError::TTError {
+                message: format!(
+                    "Could not parse --start-time, got \"{}\" or --end-time, got({})",
+                    start_time, end_time
+                ),
+            })
+        }
+    };
+
+    tx.commit()?;
+    println!("Deleted {} time records", rows_deleted);
+    Ok(())
+}

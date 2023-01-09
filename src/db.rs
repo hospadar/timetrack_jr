@@ -466,6 +466,36 @@ pub fn rename_category(tx: &mut Transaction, old: &String, new: &String) -> Resu
     Ok(())
 }
 
+pub fn bulk_delete_times(
+    tx: &mut Transaction,
+    start_time: &i64,
+    end_time: &i64,
+    non_inclusive: &bool,
+) -> Result<usize, TTError> {
+    if !(end_time > start_time) {
+        return Err(TTError::TTError {
+            message: format!(
+                "end time ({}) must be greater than start time ({})",
+                end_time, start_time
+            ),
+        });
+    }
+    let mut stmt = tx.prepare("
+        DELETE FROM times 
+        WHERE CASE WHEN :non_inclusive 
+            --non-inclusive case - only times which are completely inside the window
+            THEN (start_time >= :start AND end_time <= :end) 
+            -- default case - any time whose start or end is inside the window
+            ELSE (start_time >= :start AND start_time <= :end) OR (end_time >= :start AND end_time <= :end) 
+            END")?;
+    let rows_deleted = stmt.execute(named_params! {
+        ":non_inclusive": non_inclusive,
+        ":start": start_time,
+        ":end": end_time
+    })?;
+    Ok(rows_deleted)
+}
+
 #[cfg(test)]
 mod tests {
 

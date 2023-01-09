@@ -90,9 +90,7 @@ pub enum Commands {
     ///Show config options and currently-registered-categories
     ShowConfig,
     ///Create a new category that you can use for time tracking
-    AddCategory {
-        category_name: String,
-    },
+    AddCategory { category_name: String },
     ///Delete a category
     DeleteCategory {
         category_name: String,
@@ -105,9 +103,7 @@ pub enum Commands {
         option_value: String,
     },
     ///Remove an option
-    UnsetOption {
-        option_name: OptionName,
-    },
+    UnsetOption { option_name: OptionName },
     ///Start timing an activity - stops timing any currently running activities
     StartTiming {
         category_name: String,
@@ -128,13 +124,31 @@ pub enum Commands {
         #[arg(short, long)]
         category: Option<String>,
     },
+    ///Rename a category - updates any corresponding time as well
+    RenameCategory {
+        #[arg(short, long)]
+        old: String,
+        #[arg(short, long)]
+        new: String,
+    },
+    ///If a time record is currently open, print out the category name.  Optionally send a desktop notification.  Handy to bind to a global shortcut to pop up a notification for what's being timed right now.
     CurrentlyTiming {
         #[arg(short, long)]
         notify: bool,
     },
-    DeleteTime {
-        time_id: i64,
+    ///Delete any time records between a certain start and end time.
+    BulkDeleteTimes {
+        ///By default, delete any time whose start OR end are between --start-time and --end-time.  
+        ///If --non-inclusive is set, do not delete a time unless its start AND end is between --start-time and --end-time
+        #[arg(short, long)]
+        non_inclusive: bool,
+        #[arg(short, long)]
+        start_time: String,
+        #[arg(short, long)]
+        end_time: String,
     },
+    ///Delete a given time record.
+    DeleteTime { time_id: i64 },
     ///Export the DB to a more friendly format for analysis
     Export {
         ///Format of export to generate

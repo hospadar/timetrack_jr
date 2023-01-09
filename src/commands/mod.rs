@@ -55,5 +55,11 @@ pub fn execute(cli: &Cli, conn: &mut Connection) -> Result<(), TTError> {
             end_time,
         ),
         Commands::CurrentlyTiming { notify } => export::currently_timing(conn, notify),
+        Commands::RenameCategory { old, new } => config::rename_category(conn, old, new),
+        Commands::BulkDeleteTimes {
+            non_inclusive,
+            start_time,
+            end_time,
+        } => log::bulk_delete_times(conn, start_time, end_time, non_inclusive),
     }
 }

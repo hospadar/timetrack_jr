@@ -2,7 +2,7 @@
 This file is part of Timetrack Jr.
 Timetrack Jr. is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
-You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>. 
+You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
 use crate::{cli::OptionName, db, TTError};
 use libsqlite3_sys;
@@ -72,6 +72,13 @@ pub fn set_option(
 pub fn unset_option(conn: &mut Connection, option_name: &OptionName) -> Result<(), TTError> {
     let tx = conn.transaction()?;
     db::unset_option(&tx, option_name)?;
+    tx.commit()?;
+    Ok(())
+}
+
+pub fn rename_category(conn: &mut Connection, old: &String, new: &String) -> Result<(), TTError> {
+    let mut tx = conn.transaction()?;
+    db::rename_category(&mut tx, old, new)?;
     tx.commit()?;
     Ok(())
 }
