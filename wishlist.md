@@ -1,4 +1,3 @@
-- add human-readable data to JSON export
 - fix floating point precision in csv export
 - "rename category"
 - "bulk delete from time 1 to time 2"

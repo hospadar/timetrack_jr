@@ -108,7 +108,7 @@ fn export_csv(
                     None => "".to_string(),
                 },
                 match time.end_time {
-                    Some(end) => (((end - time.start_time) as f64) / 60.0 / 60.0).to_string(),
+                    Some(end) => format!("{:.2}", ((end - time.start_time) as f64) / 60.0 / 60.0),
                     None => "".to_string(),
                 },
                 match time.end_time {
