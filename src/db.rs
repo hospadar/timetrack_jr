@@ -445,6 +445,27 @@ pub fn get_times(
     return Ok(times);
 }
 
+pub fn rename_category(tx: &mut Transaction, old: &String, new: &String) -> Result<(), TTError> {
+    let categories = get_categories(tx)?;
+
+    if !categories.contains(old) {
+        return Err(TTError::TTError {
+            message: format!(
+                "Category \"{0}\" cannot be renamed to \"{1}\" because \"{0}\" does not exist",
+                old, new
+            ),
+        });
+    }
+
+    let mut stmt = tx.prepare("UPDATE categories SET name=? WHERE name=?")?;
+    stmt.execute((new, old))?;
+
+    //let mut stmt = tx.prepare("ALTER TABLE times SET category=? WHERE category=?")?;
+    //stmt.execute((new, old))?;
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
 
@@ -639,6 +660,56 @@ mod tests {
             },
             parse_time(&"23:60".to_string()).unwrap_err()
         );
+    }
+
+    #[test]
+    pub fn test_rename_category() {
+        let mut conn = get_initialized_db();
+        {
+            let mut tx = conn.transaction().unwrap();
+            add_category(&tx, &"work".to_string()).unwrap();
+
+            let mut expected: BTreeSet<String> = BTreeSet::new();
+            expected.insert("work".to_string());
+            assert_eq!(expected, get_categories(&tx).unwrap());
+
+            upsert_time(
+                &mut tx,
+                TimeWindow {
+                    id: None,
+                    category: "work".to_string(),
+                    start_time: 47,
+                    end_time: None,
+                },
+            )
+            .unwrap();
+
+            assert_eq!(
+                Ok(TimeWindow {
+                    id: Some(1),
+                    category: "work".to_string(),
+                    start_time: 47,
+                    end_time: None
+                }),
+                get_time(&tx, tx.last_insert_rowid())
+            );
+
+            //now rename the category, it should rename any times as well
+            rename_category(&mut tx, &"work".to_string(), &"play".to_string()).unwrap();
+            let mut expected: BTreeSet<String> = BTreeSet::new();
+            expected.insert("play".to_string());
+            assert_eq!(expected, get_categories(&tx).unwrap());
+
+            assert_eq!(
+                Ok(TimeWindow {
+                    id: Some(1),
+                    category: "play".to_string(),
+                    start_time: 47,
+                    end_time: None
+                }),
+                get_time(&tx, tx.last_insert_rowid())
+            );
+        }
     }
 
     #[test]
