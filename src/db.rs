@@ -4,6 +4,7 @@ Timetrack Jr. is free software: you can redistribute it and/or modify it under t
 Timetrack Jr. is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
 You should have received a copy of the GNU General Public License along with Timetrack Jr. If not, see <https://www.gnu.org/licenses/>.
 */
+
 use crate::{cli, TTError};
 use chrono::{DateTime, NaiveDateTime, Timelike};
 use clap::ValueEnum;
@@ -204,11 +205,18 @@ pub fn upsert_time(tx: &mut Transaction, time: TimeWindow) -> Result<(), TTError
         "SELECT id c \
         FROM times
         WHERE 
-            (id IS DISTINCT FROM :id) \
-            AND (\
-                (start_time <= :start AND end_time > :start)\
-                OR (:end IS NOT NULL and :end > start_time AND (end_time IS NULL OR :end <= end_time))\
-            )\
+            (id IS DISTINCT FROM :id) 
+            AND (
+                --upserted start time is in the middle of an already-recorded time
+                (:start >= start_time AND  :start <= end_time)
+                
+                --upserted end time is in the middle of an already-recorded time
+                --use coalesce because :end might be null
+                OR COALESCE(:end >= start_time AND :end <= end_time, FALSE)
+
+                --If there is an open time, the upserted time must be entirely before the open time
+                OR (end_time IS NULL AND (:start >= start_time OR COALESCE(:end >= start_time, FALSE)))
+            )
         ")?;
     let rows = stmt.query(named_params! {
         ":id": time.id,
@@ -439,6 +447,7 @@ pub fn get_times(
 
 #[cfg(test)]
 mod tests {
+
     use std::time::Duration;
 
     use chrono::NaiveDate;
@@ -659,27 +668,98 @@ mod tests {
                 get_time(&tx, tx.last_insert_rowid())
             );
 
+            //should fail because it potentially overlaps an open time
+            assert_matches!(
+                upsert_time(
+                    &mut tx,
+                    TimeWindow {
+                        id: None,
+                        category: "work".to_string(),
+                        start_time: 51,
+                        end_time: None,
+                    },
+                ),
+                Err(_)
+            );
+
+            //should fail because it potentially overlaps an open time
+            assert_matches!(
+                upsert_time(
+                    &mut tx,
+                    TimeWindow {
+                        id: None,
+                        category: "work".to_string(),
+                        start_time: 40,
+                        end_time: Some(51),
+                    },
+                ),
+                Err(_)
+            );
+
+            //close off the open time
             upsert_time(
                 &mut tx,
                 TimeWindow {
-                    id: None,
+                    id: Some(1),
                     category: "work".to_string(),
-                    start_time: 51,
+                    start_time: 47,
+                    end_time: Some(51),
+                },
+            )
+            .unwrap();
+
+            //now should be able to insert a new open time
+            upsert_time(
+                &mut tx,
+                TimeWindow {
+                    id: Some(2),
+                    category: "work".to_string(),
+                    start_time: 52,
                     end_time: None,
                 },
             )
             .unwrap();
 
+            //check that new open time was inserted correctly
             assert_eq!(
                 Ok(TimeWindow {
                     id: Some(2),
                     category: "work".to_string(),
-                    start_time: 51,
+                    start_time: 52,
                     end_time: None
                 }),
                 get_time(&tx, tx.last_insert_rowid())
             );
 
+            //should fail because it potentially overlaps an open time
+            assert_matches!(
+                upsert_time(
+                    &mut tx,
+                    TimeWindow {
+                        id: None,
+                        category: "work".to_string(),
+                        start_time: 48,
+                        end_time: None,
+                    },
+                ),
+                Err(_)
+            );
+
+            //should fail because it overlaps closed time
+            assert_matches!(
+                upsert_time(
+                    &mut tx,
+                    TimeWindow {
+                        id: None,
+                        category: "work".to_string(),
+                        start_time: 40,
+                        end_time: Some(48),
+                    },
+                ),
+                Err(_)
+            );
+
+            //change the start and end time
             upsert_time(
                 &mut tx,
                 TimeWindow {
@@ -690,7 +770,7 @@ mod tests {
                 },
             )
             .unwrap();
-
+            //check that modified time is reflected in DB
             assert_eq!(
                 Ok(TimeWindow {
                     id: Some(2),

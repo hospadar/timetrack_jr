@@ -11,6 +11,7 @@ readme = "README.md"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+matches = "0.1.9"
 chrono = "0.4.22"
 chrono-english = "0.1.7"
 clap = { version = "4.0.15", features = ["derive"] }
