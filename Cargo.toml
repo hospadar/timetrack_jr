@@ -26,7 +26,6 @@ serde = { version = "1.0.145", features = ["derive"] }
 serde_json = { version = "1.0.86", features = ["preserve_order"] }
 
 [[bin]]
-name = "ttjr"
 path = "src/main.rs"
 
 [profile.release]
