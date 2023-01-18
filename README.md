@@ -108,6 +108,10 @@ $ ttjr stop-timing
 $ ttjr start-timing project-for-client-a
 ```
 
+If you use the `-n/--notify` option you'll get little toast messages like this:  
+![started](images/started.png)  
+![stopped](images/stopped.png)
+
 ###  2.4. <a name='GenerateHandyExportsofLoggedTimes'></a>Generate Handy Exports of Logged Times
 
 ```sh
@@ -163,6 +167,10 @@ $ ttjr currently-timing --notify
   "end_time": null
 }
 ```
+
+If you use the `-n/--notify` option you'll get a little tost like this:  
+![current](images/current.png)
+
 
 ###  2.6. <a name='EditingandAmendingLoggedTimes'></a>Editing and Amending Logged Times
 
